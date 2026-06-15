@@ -1,9 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, Database, Layers, LineChart, ScrollText, Settings, Sparkles, Timer, TrendingUp, LogOut, User, Building2, Star } from 'lucide-react'
+import { BarChart3, Database, Layers, LineChart, ScrollText, Settings, Sparkles, Timer, TrendingUp, LogOut, User, Building2, Star, Zap } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 
 const items = [
     { to: '/', label: '总览看板', icon: BarChart3 },
+    { to: '/realtime', label: '实时看盘', icon: Zap },
     { to: '/sector', label: '行业板块', icon: Building2 },
     { to: '/watchlist', label: '自选股', icon: Star },
     { to: '/data', label: '数据中心', icon: Database },

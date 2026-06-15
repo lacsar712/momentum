@@ -37,6 +37,14 @@ from app.services.watchlist import (
     batch_import as wl_batch_import,
     query_group_items as wl_query_group_items,
 )
+from app.services.realtime import (
+    get_realtime_quotes,
+    create_session as rt_create_session,
+    get_session_snapshot as rt_get_session_snapshot,
+    update_session_symbols as rt_update_session_symbols,
+    add_session_symbols as rt_add_session_symbols,
+    remove_session_symbols as rt_remove_session_symbols,
+)
 
 router = APIRouter(prefix="/api/v1")
 
@@ -582,3 +590,66 @@ def watchlist_batch_import(payload: WatchBatchImport, session=Depends(session_de
 def watchlist_query_group_items(group_id: int, session=Depends(session_dep), user=Depends(auth_dep)):
     items = wl_query_group_items(session, user.id, group_id)
     return {"items": items}
+
+
+@router.get("/realtime/quote")
+def realtime_quote(symbols: str = "", user=Depends(auth_dep)):
+    symbol_list = [s.strip() for s in symbols.split(",") if s.strip()]
+    if not symbol_list:
+        return {"items": [], "count": 0}
+    result = get_realtime_quotes(symbol_list)
+    return result
+
+
+@router.post("/realtime/session")
+def realtime_create_session(payload: dict, user=Depends(auth_dep)):
+    symbols = payload.get("symbols", [])
+    if not symbols or not isinstance(symbols, list):
+        raise HTTPException(status_code=400, detail="symbols 参数必须是数组")
+    result = rt_create_session(symbols, user_id=user.id)
+    return result
+
+
+@router.get("/realtime/session/{session_id}")
+def realtime_get_session(session_id: str, user=Depends(auth_dep)):
+    try:
+        result = rt_get_session_snapshot(session_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/realtime/session/{session_id}")
+def realtime_update_session(session_id: str, payload: dict, user=Depends(auth_dep)):
+    symbols = payload.get("symbols", [])
+    if not isinstance(symbols, list):
+        raise HTTPException(status_code=400, detail="symbols 参数必须是数组")
+    try:
+        result = rt_update_session_symbols(session_id, symbols)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/realtime/session/{session_id}/add")
+def realtime_add_to_session(session_id: str, payload: dict, user=Depends(auth_dep)):
+    symbols = payload.get("symbols", [])
+    if not symbols or not isinstance(symbols, list):
+        raise HTTPException(status_code=400, detail="symbols 参数必须是数组")
+    try:
+        result = rt_add_session_symbols(session_id, symbols)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/realtime/session/{session_id}/remove")
+def realtime_remove_from_session(session_id: str, payload: dict, user=Depends(auth_dep)):
+    symbols = payload.get("symbols", [])
+    if not symbols or not isinstance(symbols, list):
+        raise HTTPException(status_code=400, detail="symbols 参数必须是数组")
+    try:
+        result = rt_remove_session_symbols(session_id, symbols)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
