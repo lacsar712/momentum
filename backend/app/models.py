@@ -140,3 +140,30 @@ class WatchItem(SQLModel, table=True):
     added_at: datetime = Field(default_factory=datetime.utcnow)
     note: Optional[str] = None
     group: Optional[WatchGroup] = Relationship(back_populates="items")
+
+class MockAccount(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", unique=True, index=True)
+    initial_capital: float = Field(default=1000000.0)
+    available_cash: float = Field(default=1000000.0)
+    cumulative_pnl: float = Field(default=0.0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MockTrade(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    account_id: int = Field(foreign_key="mockaccount.id", index=True)
+    stock_id: int = Field(foreign_key="stock.id", index=True)
+    direction: str
+    quantity: int
+    price: float
+    commission: float = Field(default=0.0)
+    status: str = Field(default="filled")
+    traded_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MockPosition(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    account_id: int = Field(foreign_key="mockaccount.id", index=True)
+    stock_id: int = Field(foreign_key="stock.id", index=True)
+    quantity: int = Field(default=0)
+    avg_cost: float = Field(default=0.0)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

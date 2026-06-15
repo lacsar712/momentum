@@ -17,6 +17,7 @@ import SectorFundFlow from './pages/SectorFundFlow'
 import Watchlist from './pages/Watchlist'
 import Realtime from './pages/Realtime'
 import StockDetail from './pages/StockDetail'
+import Portfolio from './pages/Portfolio'
 
 function App() {
     const [token, setToken] = useState(() => localStorage.getItem('momentum_token'))
@@ -48,6 +49,7 @@ function App() {
                     <Route path="/sector/fund-flow" element={<SectorFundFlow />} />
                     <Route path="/sector/:industry" element={<SectorDetail />} />
                     <Route path="/watchlist" element={<Watchlist />} />
+                    <Route path="/portfolio" element={<Portfolio />} />
                     <Route path="/data" element={<DataCenter />} />
                     <Route path="/screening" element={<Screening />} />
                     <Route path="/patterns" element={<Patterns />} />

@@ -156,3 +156,39 @@ class StockDetailResponse(BaseModel):
     factors: Optional[FactorValues] = None
     technical: Optional[TechnicalIndicators] = None
     patterns_30: List[PatternRecord]
+
+class MockOrderRequest(BaseModel):
+    symbol: str
+    direction: str
+    quantity: int
+
+class MockAccountSummary(BaseModel):
+    account_id: int
+    initial_capital: float
+    available_cash: float
+    position_market_value: float
+    total_assets: float
+    cumulative_pnl: float
+    today_pnl: float
+
+class MockPositionItem(BaseModel):
+    stock_id: int
+    symbol: str
+    name: str
+    quantity: int
+    avg_cost: float
+    current_price: float
+    market_value: float
+    floating_pnl: float
+    floating_pnl_pct: float
+
+class MockTradeItem(BaseModel):
+    id: int
+    symbol: str
+    name: str
+    direction: str
+    quantity: int
+    price: float
+    commission: float
+    status: str
+    traded_at: datetime

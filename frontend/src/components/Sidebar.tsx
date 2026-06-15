@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, Database, Layers, LineChart, ScrollText, Settings, Sparkles, Timer, TrendingUp, LogOut, User, Building2, Star, Zap } from 'lucide-react'
+import { BarChart3, Database, Layers, LineChart, ScrollText, Settings, Sparkles, Timer, TrendingUp, LogOut, User, Building2, Star, Zap, Briefcase } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 
 const items = [
@@ -7,6 +7,7 @@ const items = [
     { to: '/realtime', label: '实时看盘', icon: Zap },
     { to: '/sector', label: '行业板块', icon: Building2 },
     { to: '/watchlist', label: '自选股', icon: Star },
+    { to: '/portfolio', label: '模拟交易', icon: Briefcase },
     { to: '/data', label: '数据中心', icon: Database },
     { to: '/screening', label: '综合选股', icon: Sparkles },
     { to: '/patterns', label: '形态扫描', icon: Layers },

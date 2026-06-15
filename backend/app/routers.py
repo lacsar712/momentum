@@ -45,6 +45,17 @@ from app.services.realtime import (
     add_session_symbols as rt_add_session_symbols,
     remove_session_symbols as rt_remove_session_symbols,
 )
+from app.services.mock_trading import (
+    get_account_summary as mt_get_account_summary,
+    place_order as mt_place_order,
+    cancel_order as mt_cancel_order,
+    get_positions as mt_get_positions,
+    get_available_cash as mt_get_available_cash,
+    get_trade_history as mt_get_trade_history,
+    get_portfolio_nav as mt_get_portfolio_nav,
+    reset_account as mt_reset_account,
+)
+from app.schemas import MockOrderRequest
 
 router = APIRouter(prefix="/api/v1")
 
@@ -846,3 +857,60 @@ def get_stock_detail(symbol: str, session=Depends(session_dep)):
         technical=technical,
         patterns_30=pattern_records,
     )
+
+
+@router.get("/mock/account")
+def mock_get_account(session=Depends(session_dep), user=Depends(auth_dep)):
+    summary = mt_get_account_summary(session, user.id)
+    return summary
+
+
+@router.post("/mock/order")
+def mock_place_order(payload: MockOrderRequest, session=Depends(session_dep), user=Depends(auth_dep)):
+    try:
+        result = mt_place_order(session, user.id, payload.symbol, payload.direction, payload.quantity)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/mock/order/{trade_id}")
+def mock_cancel_order(trade_id: int, session=Depends(session_dep), user=Depends(auth_dep)):
+    try:
+        result = mt_cancel_order(session, user.id, trade_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/mock/positions")
+def mock_get_positions(session=Depends(session_dep), user=Depends(auth_dep)):
+    positions = mt_get_positions(session, user.id)
+    return {"items": positions}
+
+
+@router.get("/mock/cash")
+def mock_get_cash(session=Depends(session_dep), user=Depends(auth_dep)):
+    return mt_get_available_cash(session, user.id)
+
+
+@router.get("/mock/trades")
+def mock_get_trades(
+    page: int = 1,
+    page_size: int = 20,
+    direction: str | None = None,
+    symbol: str | None = None,
+    session=Depends(session_dep),
+    user=Depends(auth_dep),
+):
+    return mt_get_trade_history(session, user.id, page, page_size, direction, symbol)
+
+
+@router.get("/mock/nav")
+def mock_get_nav(session=Depends(session_dep), user=Depends(auth_dep)):
+    return mt_get_portfolio_nav(session, user.id)
+
+
+@router.post("/mock/reset")
+def mock_reset_account(session=Depends(session_dep), user=Depends(auth_dep)):
+    return mt_reset_account(session, user.id)
