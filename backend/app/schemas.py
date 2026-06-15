@@ -220,3 +220,24 @@ class DividendEventCreate(BaseModel):
 class AdjustedPriceResponse(BaseModel):
     prices: List[Dict[str, Any]]
     dividend_events: List[DividendEventItem]
+
+class FactorDistributionRequest(BaseModel):
+    factor: str
+    target_date: date
+    stock_pool: Optional[List[str]] = None
+
+class FactorLayeredBacktestRequest(BaseModel):
+    factor: str
+    target_date: date
+    n_groups: int = Field(default=5, ge=2, le=20)
+    k_days: int = Field(default=20, ge=1, le=252)
+    stock_pool: Optional[List[str]] = None
+
+class FactorCorrelationRequest(BaseModel):
+    target_date: date
+    stock_pool: Optional[List[str]] = None
+
+class StockFactorTimeseriesRequest(BaseModel):
+    symbol: str
+    start_date: date
+    end_date: date

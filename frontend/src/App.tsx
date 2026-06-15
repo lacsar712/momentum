@@ -8,6 +8,7 @@ import Patterns from './pages/Patterns'
 import Strategies from './pages/Strategies'
 import Backtest from './pages/Backtest'
 import Visual from './pages/Visual'
+import Factor from './pages/Factor'
 import Settings from './pages/Settings'
 import SystemLogs from './pages/SystemLogs'
 import Login from './pages/Login'
@@ -55,6 +56,7 @@ function App() {
                     <Route path="/patterns" element={<Patterns />} />
                     <Route path="/strategies" element={<Strategies />} />
                     <Route path="/backtest" element={<Backtest />} />
+                    <Route path="/factor" element={<Factor />} />
                     <Route path="/visual" element={<Visual />} />
                     <Route path="/stock/:symbol" element={<StockDetail />} />
                     <Route path="/settings" element={<Settings />} />

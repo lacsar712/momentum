@@ -38,6 +38,13 @@ from app.services.watchlist import (
     batch_import as wl_batch_import,
     query_group_items as wl_query_group_items,
 )
+from app.services.factor_analysis import (
+    get_factor_distribution,
+    get_factor_layered_backtest,
+    get_factor_correlation_matrix,
+    get_stock_factor_timeseries,
+    get_available_factor_dates,
+)
 from app.services.realtime import (
     get_realtime_quotes,
     create_session as rt_create_session,
@@ -56,7 +63,7 @@ from app.services.mock_trading import (
     get_portfolio_nav as mt_get_portfolio_nav,
     reset_account as mt_reset_account,
 )
-from app.schemas import MockOrderRequest
+from app.schemas import MockOrderRequest, FactorDistributionRequest, FactorLayeredBacktestRequest, FactorCorrelationRequest, StockFactorTimeseriesRequest
 
 router = APIRouter(prefix="/api/v1")
 
@@ -982,3 +989,68 @@ def mock_get_nav(session=Depends(session_dep), user=Depends(auth_dep)):
 @router.post("/mock/reset")
 def mock_reset_account(session=Depends(session_dep), user=Depends(auth_dep)):
     return mt_reset_account(session, user.id)
+
+
+@router.get("/factors/dates")
+def list_factor_dates(session=Depends(session_dep), limit: int = 100):
+    """获取可用的因子日期列表"""
+    dates = get_available_factor_dates(session, limit)
+    return {"dates": dates}
+
+
+@router.post("/factors/distribution")
+def factor_distribution(payload: FactorDistributionRequest, session=Depends(session_dep)):
+    """获取指定因子在指定日期的横截面分布"""
+    try:
+        result = get_factor_distribution(
+            session,
+            factor=payload.factor,
+            target_date=payload.target_date,
+            stock_pool=payload.stock_pool,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/factors/layered-backtest")
+def factor_layered_backtest(payload: FactorLayeredBacktestRequest, session=Depends(session_dep)):
+    """因子分层回测"""
+    try:
+        result = get_factor_layered_backtest(
+            session,
+            factor=payload.factor,
+            target_date=payload.target_date,
+            n_groups=payload.n_groups,
+            k_days=payload.k_days,
+            stock_pool=payload.stock_pool,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/factors/correlation")
+def factor_correlation(payload: FactorCorrelationRequest, session=Depends(session_dep)):
+    """获取因子相关性矩阵"""
+    result = get_factor_correlation_matrix(
+        session,
+        target_date=payload.target_date,
+        stock_pool=payload.stock_pool,
+    )
+    return result
+
+
+@router.post("/factors/timeseries")
+def stock_factor_timeseries(payload: StockFactorTimeseriesRequest, session=Depends(session_dep)):
+    """获取单只股票的因子时序数据"""
+    try:
+        result = get_stock_factor_timeseries(
+            session,
+            symbol=payload.symbol,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

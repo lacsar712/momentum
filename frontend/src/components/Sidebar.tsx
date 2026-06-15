@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, Database, Layers, LineChart, ScrollText, Settings, Sparkles, Timer, TrendingUp, LogOut, User, Building2, Star, Zap, Briefcase } from 'lucide-react'
+import { BarChart3, Database, Layers, LineChart, ScrollText, Settings, Sparkles, Timer, TrendingUp, LogOut, User, Building2, Star, Zap, Briefcase, PieChart } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 
 const items = [
@@ -13,6 +13,7 @@ const items = [
     { to: '/patterns', label: '形态扫描', icon: Layers },
     { to: '/strategies', label: '策略实验室', icon: TrendingUp },
     { to: '/backtest', label: '历史回测', icon: Timer },
+    { to: '/factor', label: '因子分析', icon: PieChart },
     { to: '/visual', label: '高级可视化', icon: LineChart },
     { to: '/settings', label: '系统设置', icon: Settings },
     { to: '/logs', label: '运行日志', icon: ScrollText },
