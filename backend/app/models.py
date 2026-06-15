@@ -15,6 +15,7 @@ class Stock(SQLModel, table=True):
     prices: List["DailyPrice"] = Relationship(back_populates="stock")
     financials: List["FinancialMetric"] = Relationship(back_populates="stock")
     factors: List["FactorValue"] = Relationship(back_populates="stock")
+    dividends: List["DividendEvent"] = Relationship(back_populates="stock")
     snapshots: List["StockSnapshot"] = Relationship(back_populates="stock")
 
 class DailyPrice(SQLModel, table=True):
@@ -167,3 +168,14 @@ class MockPosition(SQLModel, table=True):
     quantity: int = Field(default=0)
     avg_cost: float = Field(default=0.0)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class DividendEvent(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    stock_id: int = Field(foreign_key="stock.id", index=True)
+    ex_date: date = Field(index=True)
+    cash_dividend: float = Field(default=0.0)
+    bonus_ratio: float = Field(default=0.0)
+    rights_ratio: float = Field(default=0.0)
+    rights_price: float = Field(default=0.0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    stock: Optional[Stock] = Relationship(back_populates="dividends")

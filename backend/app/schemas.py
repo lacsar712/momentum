@@ -192,3 +192,31 @@ class MockTradeItem(BaseModel):
     commission: float
     status: str
     traded_at: datetime
+
+class PriceRangeAdjRequest(BaseModel):
+    symbol: str
+    start_date: date
+    end_date: date
+    frequency: str = Field(default="D")
+    adjust: str = Field(default="none")
+
+class DividendEventItem(BaseModel):
+    id: int
+    stock_id: int
+    ex_date: date
+    cash_dividend: float
+    bonus_ratio: float
+    rights_ratio: float
+    rights_price: float
+
+class DividendEventCreate(BaseModel):
+    symbol: str
+    ex_date: date
+    cash_dividend: float = 0.0
+    bonus_ratio: float = 0.0
+    rights_ratio: float = 0.0
+    rights_price: float = 0.0
+
+class AdjustedPriceResponse(BaseModel):
+    prices: List[Dict[str, Any]]
+    dividend_events: List[DividendEventItem]

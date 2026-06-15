@@ -9,14 +9,15 @@ from fastapi.responses import StreamingResponse
 import pandas as pd
 from sqlmodel import select
 from app.db import get_session
-from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog, StockSnapshot, FinancialMetric, FactorValue
-from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport, StockDetailResponse, StockBasicInfo, StockQuoteSnapshot, KLineItem, FinancialSummary, FactorValues, TechnicalIndicators, PatternRecord
+from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog, StockSnapshot, FinancialMetric, FactorValue, DividendEvent
+from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport, StockDetailResponse, StockBasicInfo, StockQuoteSnapshot, KLineItem, FinancialSummary, FactorValues, TechnicalIndicators, PatternRecord, PriceRangeAdjRequest, DividendEventCreate
 from app.services.data_sync import sync_stock_list, sync_daily, validate_integrity
 from app.services.screening import screen_stocks
 from app.services.patterns import detect_patterns, PATTERN_NAMES
 from app.services.strategies import get_strategy_map
 from app.services.backtest import run_backtest
 from app.services.cache import cache_get, cache_set
+from app.services.adjust import adjust_prices as calc_adjusted_prices
 from app.services.auth import verify_password, issue_token, get_token_payload
 from app.services.sector import (
     get_sector_list,
@@ -269,6 +270,73 @@ def get_price_range(payload: PriceRangeRequest, session=Depends(session_dep)):
             "volume": row['volume']
         })
     return results
+
+@router.post("/data/price_range_adj")
+def get_price_range_adj(payload: PriceRangeAdjRequest, session=Depends(session_dep)):
+    stock = session.exec(select(Stock).where(Stock.symbol == payload.symbol)).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="股票不存在")
+    if payload.adjust not in ("qfq", "hfq", "none"):
+        raise HTTPException(status_code=400, detail="adjust 参数必须为 qfq、hfq 或 none")
+    result = calc_adjusted_prices(session, stock.id, payload.start_date, payload.end_date, payload.frequency, payload.adjust)
+    return result
+
+@router.get("/dividend_events")
+def list_dividend_events(symbol: str, start_date: date | None = None, end_date: date | None = None, session=Depends(session_dep)):
+    stock = session.exec(select(Stock).where(Stock.symbol == symbol)).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="股票不存在")
+    query = select(DividendEvent).where(DividendEvent.stock_id == stock.id)
+    if start_date:
+        query = query.where(DividendEvent.ex_date >= start_date)
+    if end_date:
+        query = query.where(DividendEvent.ex_date <= end_date)
+    events = session.exec(query.order_by(DividendEvent.ex_date.desc())).all()
+    return {"items": [_dividend_event_to_dict(e) for e in events]}
+
+@router.post("/dividend_events")
+def create_dividend_event(payload: DividendEventCreate, session=Depends(session_dep), user=Depends(auth_dep)):
+    stock = session.exec(select(Stock).where(Stock.symbol == payload.symbol)).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="股票不存在")
+    existing = session.exec(
+        select(DividendEvent)
+        .where(DividendEvent.stock_id == stock.id, DividendEvent.ex_date == payload.ex_date)
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="该日期已存在除权事件")
+    event = DividendEvent(
+        stock_id=stock.id,
+        ex_date=payload.ex_date,
+        cash_dividend=payload.cash_dividend,
+        bonus_ratio=payload.bonus_ratio,
+        rights_ratio=payload.rights_ratio,
+        rights_price=payload.rights_price,
+    )
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+    return _dividend_event_to_dict(event)
+
+def _dividend_event_to_dict(e: DividendEvent) -> dict:
+    return {
+        "id": e.id,
+        "stock_id": e.stock_id,
+        "ex_date": e.ex_date.isoformat(),
+        "cash_dividend": e.cash_dividend,
+        "bonus_ratio": e.bonus_ratio,
+        "rights_ratio": e.rights_ratio,
+        "rights_price": e.rights_price,
+    }
+
+@router.delete("/dividend_events/{event_id}")
+def delete_dividend_event(event_id: int, session=Depends(session_dep), user=Depends(auth_dep)):
+    event = session.get(DividendEvent, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="事件不存在")
+    session.delete(event)
+    session.commit()
+    return {"status": "ok"}
 
 @router.post("/data/integrity")
 def check_integrity(payload: DateRangeRequest, session=Depends(session_dep)):
