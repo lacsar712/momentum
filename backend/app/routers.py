@@ -18,6 +18,12 @@ from app.services.strategies import get_strategy_map
 from app.services.backtest import run_backtest
 from app.services.cache import cache_get, cache_set
 from app.services.auth import verify_password, issue_token, get_token_payload
+from app.services.sector import (
+    get_sector_list,
+    get_sector_detail,
+    get_sector_fund_flow_ranking,
+    get_stock_sector_percentile,
+)
 
 router = APIRouter(prefix="/api/v1")
 
@@ -455,3 +461,33 @@ def delete_system_logs(payload: LogDeleteRequest, session=Depends(session_dep), 
         session.delete(log)
     session.commit()
     return {"status": "ok", "deleted": count}
+
+
+@router.get("/sectors")
+def list_sectors(session=Depends(session_dep)):
+    sectors = get_sector_list(session)
+    return {"total": len(sectors), "items": sectors}
+
+
+@router.get("/sectors/{industry}")
+def sector_detail(industry: str, session=Depends(session_dep)):
+    detail = get_sector_detail(session, industry)
+    if not detail:
+        raise HTTPException(status_code=404, detail="行业不存在")
+    return detail
+
+
+@router.get("/sectors/fund-flow/ranking")
+def sector_fund_flow_ranking(window: int = 5, session=Depends(session_dep)):
+    if window not in [5, 10, 20]:
+        raise HTTPException(status_code=400, detail="窗口参数必须为 5、10 或 20")
+    ranking = get_sector_fund_flow_ranking(session, window)
+    return {"window": window, "total": len(ranking), "items": ranking}
+
+
+@router.get("/stocks/{symbol}/sector-percentile")
+def stock_sector_percentile(symbol: str, session=Depends(session_dep)):
+    percentile = get_stock_sector_percentile(session, symbol)
+    if not percentile:
+        raise HTTPException(status_code=404, detail="股票不存在或无行业分类")
+    return percentile

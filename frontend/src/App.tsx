@@ -11,6 +11,9 @@ import Visual from './pages/Visual'
 import Settings from './pages/Settings'
 import SystemLogs from './pages/SystemLogs'
 import Login from './pages/Login'
+import SectorList from './pages/SectorList'
+import SectorDetail from './pages/SectorDetail'
+import SectorFundFlow from './pages/SectorFundFlow'
 
 function App() {
     const [token, setToken] = useState(() => localStorage.getItem('momentum_token'))
@@ -37,6 +40,9 @@ function App() {
             <Route element={token ? <Outlet /> : <Navigate to="/login" replace />}>
                 <Route element={<Layout />}>
                     <Route path="/" element={<Dashboard />} />
+                    <Route path="/sector" element={<SectorList />} />
+                    <Route path="/sector/fund-flow" element={<SectorFundFlow />} />
+                    <Route path="/sector/:industry" element={<SectorDetail />} />
                     <Route path="/data" element={<DataCenter />} />
                     <Route path="/screening" element={<Screening />} />
                     <Route path="/patterns" element={<Patterns />} />
