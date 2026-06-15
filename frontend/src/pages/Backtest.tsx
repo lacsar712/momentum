@@ -2,6 +2,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
 import Loading from '../components/Loading'
+import StockNameLink from '../components/StockNameLink'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 import { AxiosResponse } from 'axios'
@@ -205,17 +206,20 @@ export default function Backtest() {
                         <br />• 胜率: 盈利交易次数占比
                     </p>
                     <div className="mt-4 space-y-4 text-sm">
-                        {results.map((item: BacktestResult) => (
-                            <div key={item.symbol} className="rounded-xl border border-border px-4 py-3">
-                                <div className="font-medium">{item.symbol}</div>
-                                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                    <span>年化收益 {item.annual_return.toFixed(2)}</span>
-                                    <span>最大回撤 {item.max_drawdown.toFixed(2)}</span>
-                                    <span>夏普 {item.sharpe.toFixed(2)}</span>
-                                    <span>胜率 {item.win_rate.toFixed(2)}</span>
+                        {results.map((item: BacktestResult) => {
+                            const stockName = stocks.find((s) => s.symbol === item.symbol)?.name || item.symbol
+                            return (
+                                <div key={item.symbol} className="rounded-xl border border-border px-4 py-3">
+                                    <StockNameLink symbol={item.symbol} name={stockName} showSymbol={true} />
+                                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                        <span>年化收益 {item.annual_return.toFixed(2)}</span>
+                                        <span>最大回撤 {item.max_drawdown.toFixed(2)}</span>
+                                        <span>夏普 {item.sharpe.toFixed(2)}</span>
+                                        <span>胜率 {item.win_rate.toFixed(2)}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </div>
             </div>

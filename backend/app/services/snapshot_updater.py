@@ -80,6 +80,13 @@ def update_stock_snapshots(
             kdj_d_val = float(d_series.iloc[-1]) if not pd.isna(d_series.iloc[-1]) else None
             kdj_j_val = float(j_series.iloc[-1]) if not pd.isna(j_series.iloc[-1]) else None
             
+            # 计算均线
+            closes = df["close"].astype(float)
+            ma5_val = float(closes.tail(5).mean()) if len(closes) >= 5 else None
+            ma10_val = float(closes.tail(10).mean()) if len(closes) >= 10 else None
+            ma20_val = float(closes.tail(20).mean()) if len(closes) >= 20 else None
+            ma60_val = float(closes.tail(60).mean()) if len(closes) >= 60 else None
+            
             # 获取因子数据
             factor = session.exec(
                 select(FactorValue)
@@ -111,6 +118,10 @@ def update_stock_snapshots(
                 snapshot.momentum = momentum_val
                 snapshot.volatility = volatility_val
                 snapshot.liquidity = liquidity_val
+                snapshot.ma5 = ma5_val
+                snapshot.ma10 = ma10_val
+                snapshot.ma20 = ma20_val
+                snapshot.ma60 = ma60_val
                 snapshot.updated_at = datetime.utcnow()
             else:
                 snapshot = StockSnapshot(
@@ -127,7 +138,11 @@ def update_stock_snapshots(
                     kdj_j=kdj_j_val,
                     momentum=momentum_val,
                     volatility=volatility_val,
-                    liquidity=liquidity_val
+                    liquidity=liquidity_val,
+                    ma5=ma5_val,
+                    ma10=ma10_val,
+                    ma20=ma20_val,
+                    ma60=ma60_val
                 )
                 session.add(snapshot)
             

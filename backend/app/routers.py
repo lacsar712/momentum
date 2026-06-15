@@ -9,8 +9,8 @@ from fastapi.responses import StreamingResponse
 import pandas as pd
 from sqlmodel import select
 from app.db import get_session
-from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog
-from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport
+from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog, StockSnapshot, FinancialMetric, FactorValue
+from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport, StockDetailResponse, StockBasicInfo, StockQuoteSnapshot, KLineItem, FinancialSummary, FactorValues, TechnicalIndicators, PatternRecord
 from app.services.data_sync import sync_stock_list, sync_daily, validate_integrity
 from app.services.screening import screen_stocks
 from app.services.patterns import detect_patterns, PATTERN_NAMES
@@ -653,3 +653,196 @@ def realtime_remove_from_session(session_id: str, payload: dict, user=Depends(au
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/stocks/{symbol}/detail", response_model=StockDetailResponse)
+def get_stock_detail(symbol: str, session=Depends(session_dep)):
+    """
+    个股详情聚合接口 - 单次联表查询获取所有数据
+    返回：基本资料、最新行情、60日K线、财务摘要、因子值、技术指标、近30天形态记录
+    """
+    from sqlalchemy.orm import joinedload
+    from datetime import timedelta
+
+    stock = session.exec(
+        select(Stock)
+        .options(
+            joinedload(Stock.snapshots),
+            joinedload(Stock.prices),
+            joinedload(Stock.financials),
+            joinedload(Stock.factors),
+        )
+        .where(Stock.symbol == symbol)
+    ).first()
+
+    if not stock:
+        raise HTTPException(status_code=404, detail="股票不存在")
+
+    stock_id = stock.id
+
+    kline_60 = session.exec(
+        select(DailyPrice)
+        .where(DailyPrice.stock_id == stock_id)
+        .order_by(DailyPrice.trade_date.desc())
+        .limit(60)
+    ).all()
+    kline_60 = sorted(kline_60, key=lambda x: x.trade_date)
+
+    snapshot = stock.snapshots[0] if stock.snapshots else None
+
+    financial = session.exec(
+        select(FinancialMetric)
+        .where(FinancialMetric.stock_id == stock_id)
+        .order_by(FinancialMetric.report_date.desc())
+        .limit(1)
+    ).first()
+
+    factor = session.exec(
+        select(FactorValue)
+        .where(FactorValue.stock_id == stock_id)
+        .order_by(FactorValue.factor_date.desc())
+        .limit(1)
+    ).first()
+
+    thirty_days_ago = date.today() - timedelta(days=30)
+    patterns = session.exec(
+        select(PatternResult)
+        .where(
+            PatternResult.symbol == symbol,
+            PatternResult.detected_date >= thirty_days_ago
+        )
+        .order_by(PatternResult.detected_date.desc())
+    ).all()
+
+    change_pct = None
+    if len(kline_60) >= 2:
+        prev_close = kline_60[-2].close
+        curr_close = kline_60[-1].close
+        change_pct = ((curr_close - prev_close) / prev_close) * 100
+
+    macd_status = None
+    if snapshot and snapshot.macd_line is not None and snapshot.macd_signal is not None and snapshot.macd_hist is not None:
+        if snapshot.macd_hist > 0 and snapshot.macd_line > snapshot.macd_signal:
+            macd_status = "多头排列"
+        elif snapshot.macd_hist < 0 and snapshot.macd_line < snapshot.macd_signal:
+            macd_status = "空头排列"
+        elif snapshot.macd_hist > 0 and snapshot.macd_line < snapshot.macd_signal:
+            macd_status = "顶背离信号"
+        elif snapshot.macd_hist < 0 and snapshot.macd_line > snapshot.macd_signal:
+            macd_status = "底背离信号"
+        else:
+            macd_status = "中性"
+
+    kdj_status = None
+    if snapshot and snapshot.kdj_k is not None and snapshot.kdj_d is not None and snapshot.kdj_j is not None:
+        if snapshot.kdj_k > snapshot.kdj_d and snapshot.kdj_k < 80:
+            kdj_status = "金叉持有"
+        elif snapshot.kdj_k < snapshot.kdj_d and snapshot.kdj_k > 20:
+            kdj_status = "死叉观望"
+        elif snapshot.kdj_k > 80:
+            kdj_status = "超买区域"
+        elif snapshot.kdj_k < 20:
+            kdj_status = "超卖区域"
+        else:
+            kdj_status = "中性"
+
+    ma_trend = None
+    if snapshot and snapshot.ma5 and snapshot.ma10 and snapshot.ma20 and snapshot.ma60:
+        if snapshot.ma5 > snapshot.ma10 > snapshot.ma20 > snapshot.ma60:
+            ma_trend = "多头排列"
+        elif snapshot.ma5 < snapshot.ma10 < snapshot.ma20 < snapshot.ma60:
+            ma_trend = "空头排列"
+        elif snapshot.ma5 > snapshot.ma10 > snapshot.ma20:
+            ma_trend = "短期多头"
+        elif snapshot.ma5 < snapshot.ma10 < snapshot.ma20:
+            ma_trend = "短期空头"
+        else:
+            ma_trend = "震荡整理"
+
+    concept_tags = None
+    if stock.concept_tags:
+        concept_tags = [tag.strip() for tag in stock.concept_tags.split(",") if tag.strip()]
+
+    basic_info = StockBasicInfo(
+        symbol=stock.symbol,
+        name=stock.name,
+        market=stock.market,
+        industry=stock.industry,
+        concept_tags=concept_tags,
+        market_cap=stock.market_cap,
+        pe_ratio=stock.pe_ratio,
+        pb_ratio=stock.pb_ratio,
+    )
+
+    quote = StockQuoteSnapshot(
+        latest_date=snapshot.latest_date if snapshot else (kline_60[-1].trade_date if kline_60 else date.today()),
+        close=snapshot.close if snapshot else (kline_60[-1].close if kline_60 else 0),
+        volume=snapshot.volume if snapshot else (kline_60[-1].volume if kline_60 else 0),
+        change_pct=change_pct,
+    )
+
+    kline_items = [
+        KLineItem(
+            trade_date=k.trade_date,
+            open=k.open,
+            high=k.high,
+            low=k.low,
+            close=k.close,
+            volume=k.volume,
+        )
+        for k in kline_60
+    ]
+
+    financial_summary = None
+    if financial:
+        financial_summary = FinancialSummary(
+            report_date=financial.report_date,
+            revenue=financial.revenue,
+            net_profit=financial.net_profit,
+            roe=financial.roe,
+            debt_ratio=financial.debt_ratio,
+            revenue_yoy=financial.revenue_yoy,
+            net_profit_yoy=financial.net_profit_yoy,
+        )
+
+    factor_values = None
+    if factor:
+        factor_values = FactorValues(
+            factor_date=factor.factor_date,
+            momentum=factor.momentum,
+            volatility=factor.volatility,
+            liquidity=factor.liquidity,
+        )
+
+    technical = None
+    if snapshot:
+        technical = TechnicalIndicators(
+            rsi=snapshot.rsi,
+            macd_status=macd_status,
+            kdj_status=kdj_status,
+            ma_trend=ma_trend,
+            ma5=snapshot.ma5,
+            ma10=snapshot.ma10,
+            ma20=snapshot.ma20,
+            ma60=snapshot.ma60,
+        )
+
+    pattern_records = [
+        PatternRecord(
+            pattern_name=p.pattern_name,
+            detected_date=p.detected_date,
+            success_rate=p.success_rate,
+            score=p.score,
+        )
+        for p in patterns
+    ]
+
+    return StockDetailResponse(
+        basic_info=basic_info,
+        quote=quote,
+        kline_60=kline_items,
+        financial=financial_summary,
+        factors=factor_values,
+        technical=technical,
+        patterns_30=pattern_records,
+    )

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
@@ -92,3 +92,67 @@ class WatchItemNoteUpdate(BaseModel):
 class WatchBatchImport(BaseModel):
     group_id: int
     stock_ids: List[int]
+
+class StockBasicInfo(BaseModel):
+    symbol: str
+    name: str
+    market: str
+    industry: Optional[str] = None
+    concept_tags: Optional[List[str]] = None
+    market_cap: Optional[float] = None
+    pe_ratio: Optional[float] = None
+    pb_ratio: Optional[float] = None
+
+class StockQuoteSnapshot(BaseModel):
+    latest_date: date
+    close: float
+    volume: float
+    change_pct: Optional[float] = None
+
+class KLineItem(BaseModel):
+    trade_date: date
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+class FinancialSummary(BaseModel):
+    report_date: date
+    revenue: Optional[float] = None
+    net_profit: Optional[float] = None
+    roe: Optional[float] = None
+    debt_ratio: Optional[float] = None
+    revenue_yoy: Optional[float] = None
+    net_profit_yoy: Optional[float] = None
+
+class FactorValues(BaseModel):
+    factor_date: date
+    momentum: Optional[float] = None
+    volatility: Optional[float] = None
+    liquidity: Optional[float] = None
+
+class TechnicalIndicators(BaseModel):
+    rsi: Optional[float] = None
+    macd_status: Optional[str] = None
+    kdj_status: Optional[str] = None
+    ma_trend: Optional[str] = None
+    ma5: Optional[float] = None
+    ma10: Optional[float] = None
+    ma20: Optional[float] = None
+    ma60: Optional[float] = None
+
+class PatternRecord(BaseModel):
+    pattern_name: str
+    detected_date: date
+    success_rate: Optional[float] = None
+    score: Optional[float] = None
+
+class StockDetailResponse(BaseModel):
+    basic_info: StockBasicInfo
+    quote: StockQuoteSnapshot
+    kline_60: List[KLineItem]
+    financial: Optional[FinancialSummary] = None
+    factors: Optional[FactorValues] = None
+    technical: Optional[TechnicalIndicators] = None
+    patterns_30: List[PatternRecord]

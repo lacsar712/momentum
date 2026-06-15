@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
 import { ArrowLeft, TrendingUp, TrendingDown, Building2, Activity, BarChart3 } from 'lucide-react'
 import Loading from '../components/Loading'
+import StockNameLink from '../components/StockNameLink'
 import { api } from '../lib/api'
 
 interface IndexPoint {
@@ -307,8 +308,7 @@ export default function SectorDetail() {
                                     {detail.top_gainers.map((stock, index) => (
                                         <div
                                             key={stock.symbol}
-                                            className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors cursor-pointer"
-                                            onClick={() => navigate(`/visual?symbol=${stock.symbol}`)}
+                                            className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
                                                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -317,7 +317,7 @@ export default function SectorDetail() {
                                                     {index + 1}
                                                 </span>
                                                 <div>
-                                                    <p className="text-sm font-semibold text-slate-900">{stock.name}</p>
+                                                    <StockNameLink symbol={stock.symbol} name={stock.name} />
                                                     <p className="text-xs text-slate-400">{stock.symbol}</p>
                                                 </div>
                                             </div>
@@ -347,8 +347,7 @@ export default function SectorDetail() {
                                     {detail.top_losers.map((stock, index) => (
                                         <div
                                             key={stock.symbol}
-                                            className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors cursor-pointer"
-                                            onClick={() => navigate(`/visual?symbol=${stock.symbol}`)}
+                                            className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
                                                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -357,7 +356,7 @@ export default function SectorDetail() {
                                                     {index + 1}
                                                 </span>
                                                 <div>
-                                                    <p className="text-sm font-semibold text-slate-900">{stock.name}</p>
+                                                    <StockNameLink symbol={stock.symbol} name={stock.name} />
                                                     <p className="text-xs text-slate-400">{stock.symbol}</p>
                                                 </div>
                                             </div>

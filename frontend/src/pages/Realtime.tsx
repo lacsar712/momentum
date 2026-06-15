@@ -5,6 +5,7 @@ import {
     TrendingUp, TrendingDown, Search, Star, Check, Loader2,
     ChevronDown,
 } from 'lucide-react'
+import StockNameLink from '../components/StockNameLink'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 
@@ -384,8 +385,7 @@ export default function Realtime() {
                         return (
                             <div
                                 key={symbol}
-                                onClick={() => navigate(`/visual?symbol=${symbol}`)}
-                                className={`group relative rounded-2xl bg-white border border-slate-200/60 shadow-sm p-5 cursor-pointer transition-all duration-300 hover:shadow-md hover:border-slate-300 ${flashClass}`}
+                                className={`group relative rounded-2xl bg-white border border-slate-200/60 shadow-sm p-5 transition-all duration-300 hover:shadow-md hover:border-slate-300 ${flashClass}`}
                             >
                                 <button
                                     onClick={(e) => { e.stopPropagation(); removeStock(symbol) }}
@@ -398,7 +398,7 @@ export default function Realtime() {
                                 <div className="mb-3">
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-lg font-bold text-slate-900">{symbol}</span>
-                                        <span className="text-sm text-slate-500 truncate">{quote?.name || '-'}</span>
+                                        <StockNameLink symbol={symbol} name={quote?.name || '-'} className="text-sm" />
                                     </div>
                                 </div>
 
@@ -460,11 +460,12 @@ export default function Realtime() {
                                 return (
                                     <tr
                                         key={symbol}
-                                        onClick={() => navigate(`/visual?symbol=${symbol}`)}
-                                        className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${flashClass}`}
+                                        className={`hover:bg-slate-50/80 transition-colors ${flashClass}`}
                                     >
                                         <td className="px-4 py-3 text-sm font-medium text-slate-900">{symbol}</td>
-                                        <td className="px-4 py-3 text-sm text-slate-700">{quote?.name || '-'}</td>
+                                        <td className="px-4 py-3">
+                                            <StockNameLink symbol={symbol} name={quote?.name || '-'} />
+                                        </td>
                                         <td className={`px-4 py-3 text-sm text-right font-bold ${isUp ? 'text-red-600' : 'text-emerald-600'}`}>
                                             {quote ? quote.price.toFixed(2) : '--'}
                                         </td>

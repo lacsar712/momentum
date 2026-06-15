@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Camera, Database, List, TrendingUp, ArrowRight, AlertCircle } from 'lucide-react'
 import Modal from '../components/Modal'
 import Loading from '../components/Loading'
+import StockNameLink from '../components/StockNameLink'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
-import { useAuth } from '../lib/auth'
 import { AxiosResponse } from 'axios'
 import DatePicker from '../components/DatePicker'
 
@@ -300,7 +300,7 @@ export default function DataCenter() {
                                             {item.market}
                                         </div>
                                         <div>
-                                            <div className="font-medium text-sm group-hover:text-primary transition-colors">{item.name}</div>
+                                            <StockNameLink symbol={item.symbol} name={item.name} className="text-sm" />
                                             <div className="text-xs text-muted-foreground font-mono mt-0.5">{item.symbol}</div>
                                         </div>
                                     </div>

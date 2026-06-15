@@ -8,12 +8,14 @@ class Stock(SQLModel, table=True):
     name: str
     market: str
     industry: Optional[str] = None
+    concept_tags: Optional[str] = None
     market_cap: Optional[float] = None
     pe_ratio: Optional[float] = None
     pb_ratio: Optional[float] = None
     prices: List["DailyPrice"] = Relationship(back_populates="stock")
     financials: List["FinancialMetric"] = Relationship(back_populates="stock")
     factors: List["FactorValue"] = Relationship(back_populates="stock")
+    snapshots: List["StockSnapshot"] = Relationship(back_populates="stock")
 
 class DailyPrice(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -35,6 +37,8 @@ class FinancialMetric(SQLModel, table=True):
     net_profit: Optional[float] = None
     roe: Optional[float] = None
     debt_ratio: Optional[float] = None
+    revenue_yoy: Optional[float] = None
+    net_profit_yoy: Optional[float] = None
     stock: Optional[Stock] = Relationship(back_populates="financials")
 
 class FactorValue(SQLModel, table=True):
@@ -114,6 +118,11 @@ class StockSnapshot(SQLModel, table=True):
     volatility: Optional[float] = None
     liquidity: Optional[float] = None
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    stock: Optional[Stock] = Relationship(back_populates="snapshots")
+    ma5: Optional[float] = None
+    ma10: Optional[float] = None
+    ma20: Optional[float] = None
+    ma60: Optional[float] = None
 
 class WatchGroup(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

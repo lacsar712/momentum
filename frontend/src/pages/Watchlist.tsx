@@ -6,6 +6,7 @@ import {
     FolderOpen, ChevronRight, Loader2,
 } from 'lucide-react'
 import Loading from '../components/Loading'
+import StockNameLink from '../components/StockNameLink'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 
@@ -494,14 +495,15 @@ export default function Watchlist() {
                                             key={item.item_id}
                                             draggable
                                             onDragStart={() => handleItemDragStart(item.item_id, selectedGroupId!)}
-                                            className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
-                                            onClick={() => navigate(`/visual?symbol=${item.symbol}`)}
+                                            className="hover:bg-slate-50/80 transition-colors group"
                                         >
                                             <td className="px-4 py-3 text-slate-300 cursor-grab" onClick={(e) => e.stopPropagation()}>
                                                 <GripVertical size={14} />
                                             </td>
                                             <td className="px-4 py-3 text-sm font-medium text-slate-900">{item.symbol}</td>
-                                            <td className="px-4 py-3 text-sm text-slate-700">{item.name}</td>
+                                            <td className="px-4 py-3">
+                                                <StockNameLink symbol={item.symbol} name={item.name} />
+                                            </td>
                                             <td className="px-4 py-3 text-sm text-right font-medium text-slate-900">
                                                 {item.latest_close !== null ? item.latest_close.toFixed(2) : '-'}
                                             </td>

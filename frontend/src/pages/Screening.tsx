@@ -5,6 +5,7 @@ import { ChangeEvent, useEffect, useState } from 'react'
 import { z } from 'zod'
 import Modal from '../components/Modal'
 import Loading from '../components/Loading'
+import StockNameLink from '../components/StockNameLink'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 import { AxiosResponse } from 'axios'
@@ -672,8 +673,7 @@ export default function Screening() {
                                         {items.map((item: ScreeningItem) => (
                                             <tr key={item.symbol} className="hover:bg-slate-50/50 transition">
                                                 <td className="py-3">
-                                                    <span className="font-medium text-slate-800">{item.name}</span>
-                                                    <span className="text-xs text-slate-400 ml-1.5">{item.symbol}</span>
+                                                    <StockNameLink symbol={item.symbol} name={item.name} showSymbol={true} />
                                                 </td>
                                                 <td className="text-slate-600">{item.industry || '-'}</td>
                                                 <td className="text-slate-600">{item.market_cap ? (item.market_cap / 100000000).toFixed(2) + ' 亿' : '-'}</td>

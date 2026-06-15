@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import Loading from '../components/Loading'
+import StockNameLink from '../components/StockNameLink'
 import { useToast } from '../components/Toast'
 import { AxiosResponse } from 'axios'
 import DatePicker from '../components/DatePicker'
@@ -135,7 +136,7 @@ export default function Patterns() {
                         {results.map((item) => (
                             <div key={item.symbol} className="rounded-xl border border-border px-4 py-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="font-medium text-lg">{item.name} <span className="text-sm text-muted-foreground ml-1">{item.symbol}</span></span>
+                                    <StockNameLink symbol={item.symbol} name={item.name} showSymbol={true} className="text-lg" />
                                 </div>
                                 <div className="mt-3 flex flex-col gap-2">
                                     {item.patterns.map((p) => (
