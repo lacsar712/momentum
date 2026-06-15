@@ -98,14 +98,11 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class StockSnapshot(SQLModel, table=True):
-    """预计算快照表 - 存储每只股票的最新价格和技术指标，用于快速筛选"""
     id: Optional[int] = Field(default=None, primary_key=True)
     stock_id: int = Field(foreign_key="stock.id", index=True, unique=True)
-    # 最新价格数据
     latest_date: date
     close: float
     volume: float
-    # 技术指标 (预计算)
     rsi: Optional[float] = None
     macd_line: Optional[float] = None
     macd_signal: Optional[float] = None
@@ -113,9 +110,24 @@ class StockSnapshot(SQLModel, table=True):
     kdj_k: Optional[float] = None
     kdj_d: Optional[float] = None
     kdj_j: Optional[float] = None
-    # 因子数据
     momentum: Optional[float] = None
     volatility: Optional[float] = None
     liquidity: Optional[float] = None
-    # 更新时间
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class WatchGroup(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    name: str
+    sort_weight: int = Field(default=0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    items: List["WatchItem"] = Relationship(back_populates="group")
+
+class WatchItem(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    stock_id: int = Field(foreign_key="stock.id", index=True)
+    group_id: int = Field(foreign_key="watchgroup.id", index=True)
+    added_at: datetime = Field(default_factory=datetime.utcnow)
+    note: Optional[str] = None
+    group: Optional[WatchGroup] = Relationship(back_populates="items")

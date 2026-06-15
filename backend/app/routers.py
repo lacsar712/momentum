@@ -10,7 +10,7 @@ import pandas as pd
 from sqlmodel import select
 from app.db import get_session
 from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog
-from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest
+from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport
 from app.services.data_sync import sync_stock_list, sync_daily, validate_integrity
 from app.services.screening import screen_stocks
 from app.services.patterns import detect_patterns, PATTERN_NAMES
@@ -23,6 +23,19 @@ from app.services.sector import (
     get_sector_detail,
     get_sector_fund_flow_ranking,
     get_stock_sector_percentile,
+)
+from app.services.watchlist import (
+    list_groups as wl_list_groups,
+    create_group as wl_create_group,
+    update_group as wl_update_group,
+    delete_group as wl_delete_group,
+    reorder_groups as wl_reorder_groups,
+    add_item as wl_add_item,
+    remove_item as wl_remove_item,
+    update_item_note as wl_update_item_note,
+    move_item as wl_move_item,
+    batch_import as wl_batch_import,
+    query_group_items as wl_query_group_items,
 )
 
 router = APIRouter(prefix="/api/v1")
@@ -491,3 +504,81 @@ def stock_sector_percentile(symbol: str, session=Depends(session_dep)):
     if not percentile:
         raise HTTPException(status_code=404, detail="股票不存在或无行业分类")
     return percentile
+
+
+@router.get("/watchlist/groups")
+def watchlist_list_groups(session=Depends(session_dep), user=Depends(auth_dep)):
+    groups = wl_list_groups(session, user.id)
+    return {"items": groups}
+
+
+@router.post("/watchlist/groups")
+def watchlist_create_group(payload: WatchGroupCreate, session=Depends(session_dep), user=Depends(auth_dep)):
+    group = wl_create_group(session, user.id, payload.name)
+    return group
+
+
+@router.put("/watchlist/groups/reorder")
+def watchlist_reorder_groups(payload: WatchGroupReorder, session=Depends(session_dep), user=Depends(auth_dep)):
+    wl_reorder_groups(session, user.id, payload.ordered_ids)
+    return {"status": "ok"}
+
+
+@router.put("/watchlist/groups/{group_id}")
+def watchlist_update_group(group_id: int, payload: WatchGroupUpdate, session=Depends(session_dep), user=Depends(auth_dep)):
+    group = wl_update_group(session, user.id, group_id, payload.name)
+    if not group:
+        raise HTTPException(status_code=404, detail="分组不存在")
+    return group
+
+
+@router.delete("/watchlist/groups/{group_id}")
+def watchlist_delete_group(group_id: int, session=Depends(session_dep), user=Depends(auth_dep)):
+    ok = wl_delete_group(session, user.id, group_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="分组不存在")
+    return {"status": "ok"}
+
+
+@router.post("/watchlist/items")
+def watchlist_add_item(payload: WatchItemAdd, session=Depends(session_dep), user=Depends(auth_dep)):
+    item = wl_add_item(session, user.id, payload.stock_id, payload.group_id, payload.note)
+    if not item:
+        raise HTTPException(status_code=400, detail="添加失败，分组不存在")
+    return item
+
+
+@router.delete("/watchlist/items/{item_id}")
+def watchlist_remove_item(item_id: int, session=Depends(session_dep), user=Depends(auth_dep)):
+    ok = wl_remove_item(session, user.id, item_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="关注项不存在")
+    return {"status": "ok"}
+
+
+@router.put("/watchlist/items/{item_id}/note")
+def watchlist_update_note(item_id: int, payload: WatchItemNoteUpdate, session=Depends(session_dep), user=Depends(auth_dep)):
+    item = wl_update_item_note(session, user.id, item_id, payload.note)
+    if not item:
+        raise HTTPException(status_code=404, detail="关注项不存在")
+    return item
+
+
+@router.put("/watchlist/items/{item_id}/move")
+def watchlist_move_item(item_id: int, payload: WatchItemMove, session=Depends(session_dep), user=Depends(auth_dep)):
+    item = wl_move_item(session, user.id, item_id, payload.target_group_id)
+    if not item:
+        raise HTTPException(status_code=400, detail="移动失败，关注项或目标分组不存在")
+    return item
+
+
+@router.post("/watchlist/items/batch-import")
+def watchlist_batch_import(payload: WatchBatchImport, session=Depends(session_dep), user=Depends(auth_dep)):
+    items = wl_batch_import(session, user.id, payload.group_id, payload.stock_ids)
+    return {"imported": len(items), "items": items}
+
+
+@router.get("/watchlist/groups/{group_id}/items")
+def watchlist_query_group_items(group_id: int, session=Depends(session_dep), user=Depends(auth_dep)):
+    items = wl_query_group_items(session, user.id, group_id)
+    return {"items": items}

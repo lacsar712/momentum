@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
 import Loading from '../components/Loading'
 import { api } from '../lib/api'
@@ -28,10 +29,11 @@ interface DateRange {
 }
 
 export default function Visual() {
+    const [searchParams] = useSearchParams()
     const { pushToast } = useToast()
     const [stocks, setStocks] = useState<StockItem[]>([])
     const [loading, setLoading] = useState(false)
-    const [symbol, setSymbol] = useState('')
+    const [symbol, setSymbol] = useState(() => searchParams.get('symbol') || '')
     const [range, setRange] = useState<DateRange>({ start: '', end: '' })
     const [prices, setPrices] = useState<PriceItem[]>([])
 
@@ -44,13 +46,16 @@ export default function Visual() {
     })
 
     useEffect(() => {
+        const initialSymbol = searchParams.get('symbol')
         api.get<{ items: StockItem[] }>('/stocks', { params: { limit: 10000 } }).then((res) => {
             setStocks(res.data.items)
-            if (res.data.items.length > 0) {
+            if (initialSymbol) {
+                setSymbol(initialSymbol)
+            } else if (res.data.items.length > 0) {
                 setSymbol(res.data.items[0].symbol)
             }
         })
-    }, [])
+    }, [searchParams])
 
     const fetchKline = () => {
         if (!symbol || !range.start || !range.end) {

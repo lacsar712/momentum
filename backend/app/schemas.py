@@ -68,3 +68,27 @@ class LogDeleteRequest(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     delete_all: bool = False
+
+class WatchGroupCreate(BaseModel):
+    name: str
+
+class WatchGroupUpdate(BaseModel):
+    name: str
+
+class WatchGroupReorder(BaseModel):
+    ordered_ids: List[int]
+
+class WatchItemAdd(BaseModel):
+    stock_id: int
+    group_id: int
+    note: Optional[str] = None
+
+class WatchItemMove(BaseModel):
+    target_group_id: int
+
+class WatchItemNoteUpdate(BaseModel):
+    note: str
+
+class WatchBatchImport(BaseModel):
+    group_id: int
+    stock_ids: List[int]
