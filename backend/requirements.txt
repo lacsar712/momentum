@@ -1,0 +1,15 @@
+fastapi==0.109.0
+uvicorn==0.27.0
+sqlmodel==0.0.14
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+redis==5.0.1
+pandas==2.2.0
+numpy==1.26.3
+requests==2.31.0
+apscheduler==3.10.4
+# akshare is large, adding it. If build is too slow, we might need a custom mirror or base image.
+akshare>=1.12.0
+python-multipart==0.0.6
+pydantic-settings==2.1.0
+openpyxl==3.1.2
