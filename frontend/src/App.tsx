@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import DataCenter from './pages/DataCenter'
 import Screening from './pages/Screening'
+import Anomaly from './pages/Anomaly'
 import Patterns from './pages/Patterns'
 import Strategies from './pages/Strategies'
 import Backtest from './pages/Backtest'
@@ -53,6 +54,7 @@ function App() {
                     <Route path="/portfolio" element={<Portfolio />} />
                     <Route path="/data" element={<DataCenter />} />
                     <Route path="/screening" element={<Screening />} />
+                    <Route path="/anomaly" element={<Anomaly />} />
                     <Route path="/patterns" element={<Patterns />} />
                     <Route path="/strategies" element={<Strategies />} />
                     <Route path="/backtest" element={<Backtest />} />

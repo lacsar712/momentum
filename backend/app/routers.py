@@ -9,8 +9,8 @@ from fastapi.responses import StreamingResponse
 import pandas as pd
 from sqlmodel import select
 from app.db import get_session
-from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog, StockSnapshot, FinancialMetric, FactorValue, DividendEvent
-from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport, StockDetailResponse, StockBasicInfo, StockQuoteSnapshot, KLineItem, FinancialSummary, FactorValues, TechnicalIndicators, PatternRecord, PriceRangeAdjRequest, DividendEventCreate
+from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog, StockSnapshot, FinancialMetric, FactorValue, DividendEvent, AnomalyEvent
+from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport, StockDetailResponse, StockBasicInfo, StockQuoteSnapshot, KLineItem, FinancialSummary, FactorValues, TechnicalIndicators, PatternRecord, PriceRangeAdjRequest, DividendEventCreate, AnomalyScanRequest, AnomalyEventFilter, MockOrderRequest, FactorDistributionRequest, FactorLayeredBacktestRequest, FactorCorrelationRequest, StockFactorTimeseriesRequest
 from app.services.data_sync import sync_stock_list, sync_daily, validate_integrity
 from app.services.screening import screen_stocks
 from app.services.patterns import detect_patterns, PATTERN_NAMES
@@ -52,6 +52,10 @@ from app.services.realtime import (
     update_session_symbols as rt_update_session_symbols,
     add_session_symbols as rt_add_session_symbols,
     remove_session_symbols as rt_remove_session_symbols,
+)
+from app.services.anomaly import (
+    get_rule_definitions,
+    scan_market_anomalies,
 )
 from app.services.mock_trading import (
     get_account_summary as mt_get_account_summary,
@@ -1054,3 +1058,158 @@ def stock_factor_timeseries(payload: StockFactorTimeseriesRequest, session=Depen
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/anomaly/rules")
+def get_anomaly_rules():
+    """返回所有异动规则及其参数定义与默认值"""
+    return get_rule_definitions()
+
+ANOMALY_SCAN_STATE = {
+    "status": "idle",
+    "current": 0,
+    "total": 0,
+    "message": "",
+    "results": [],
+}
+
+def _update_anomaly_progress(current, total, message=""):
+    ANOMALY_SCAN_STATE["current"] = current
+    ANOMALY_SCAN_STATE["total"] = total
+    ANOMALY_SCAN_STATE["message"] = message
+
+def _anomaly_event_to_dict(event: AnomalyEvent) -> dict:
+    import json
+    return {
+        "id": event.id,
+        "symbol": event.symbol,
+        "name": event.name,
+        "rule_id": event.rule_id,
+        "rule_name": event.rule_name,
+        "trigger_date": event.trigger_date.isoformat(),
+        "strength_score": event.strength_score,
+        "metrics": json.loads(event.metrics_json),
+        "created_at": event.created_at.isoformat() if event.created_at else None,
+    }
+
+@router.get("/anomaly/scan/progress")
+def get_anomaly_scan_progress():
+    """获取异动扫描进度"""
+    return ANOMALY_SCAN_STATE
+
+@router.post("/anomaly/scan")
+def scan_anomalies(
+    payload: AnomalyScanRequest,
+    background_tasks: BackgroundTasks,
+    session=Depends(session_dep),
+    user=Depends(auth_dep),
+):
+    """对全市场或股票池在指定区间扫描并落库"""
+    if ANOMALY_SCAN_STATE["status"] == "running":
+        raise HTTPException(status_code=400, detail="扫描任务正在进行中")
+
+    ANOMALY_SCAN_STATE.update({
+        "status": "running",
+        "current": 0,
+        "total": 0,
+        "message": "正在启动扫描...",
+        "results": [],
+    })
+
+    def run_scan_task():
+        import json
+        try:
+            with get_session() as sess:
+                rule_configs = {k: v.dict() for k, v in payload.rule_configs.items()}
+                results = scan_market_anomalies(
+                    sess,
+                    rule_configs,
+                    symbols=payload.symbols,
+                    start_date=payload.start_date,
+                    end_date=payload.end_date,
+                    progress_callback=_update_anomaly_progress,
+                )
+
+                results.sort(key=lambda x: x["strength_score"], reverse=True)
+
+                for result in results:
+                    event = AnomalyEvent(
+                        symbol=result["symbol"],
+                        name=result["name"],
+                        rule_id=result["rule_id"],
+                        rule_name=result["rule_name"],
+                        trigger_date=result["trigger_date"],
+                        strength_score=result["strength_score"],
+                        metrics_json=json.dumps(result["metrics"], ensure_ascii=False),
+                    )
+                    sess.add(event)
+                sess.commit()
+
+                ANOMALY_SCAN_STATE.update({
+                    "status": "finished",
+                    "results": results,
+                    "message": f"扫描完成，共发现 {len(results)} 个异动事件",
+                })
+        except Exception as e:
+            print(f"Anomaly scan failed: {e}")
+            import traceback
+            traceback.print_exc()
+            ANOMALY_SCAN_STATE.update({
+                "status": "error",
+                "message": f"扫描失败: {str(e)}",
+            })
+
+    background_tasks.add_task(run_scan_task)
+    return {"status": "started", "message": "异动扫描已开始"}
+
+@router.post("/anomaly/events")
+def get_anomaly_events(payload: AnomalyEventFilter, session=Depends(session_dep)):
+    """分页查询历史事件，支持按规则、股票、日期范围、强度阈值过滤"""
+    query = select(AnomalyEvent)
+
+    if payload.rule_id:
+        query = query.where(AnomalyEvent.rule_id == payload.rule_id)
+    if payload.symbol:
+        query = query.where(AnomalyEvent.symbol.contains(payload.symbol) | AnomalyEvent.name.contains(payload.symbol))
+    if payload.start_date:
+        query = query.where(AnomalyEvent.trigger_date >= payload.start_date)
+    if payload.end_date:
+        query = query.where(AnomalyEvent.trigger_date <= payload.end_date)
+    if payload.min_strength is not None:
+        query = query.where(AnomalyEvent.strength_score >= payload.min_strength)
+
+    total = len(session.exec(query).all())
+
+    query = query.order_by(AnomalyEvent.trigger_date.desc(), AnomalyEvent.strength_score.desc())
+    offset = (payload.page - 1) * payload.page_size
+    events = session.exec(query.offset(offset).limit(payload.page_size)).all()
+
+    return {
+        "total": total,
+        "page": payload.page,
+        "page_size": payload.page_size,
+        "items": [_anomaly_event_to_dict(e) for e in events],
+    }
+
+@router.get("/anomaly/stats")
+def get_anomaly_stats(session=Depends(session_dep), start_date: Optional[date] = None, end_date: Optional[date] = None):
+    """按规则统计触发次数"""
+    query = select(AnomalyEvent)
+    if start_date:
+        query = query.where(AnomalyEvent.trigger_date >= start_date)
+    if end_date:
+        query = query.where(AnomalyEvent.trigger_date <= end_date)
+
+    events = session.exec(query).all()
+
+    stats = {}
+    for event in events:
+        key = (event.rule_id, event.rule_name)
+        if key not in stats:
+            stats[key] = 0
+        stats[key] += 1
+
+    result = [
+        {"rule_id": k[0], "rule_name": k[1], "count": v}
+        for k, v in sorted(stats.items(), key=lambda x: x[1], reverse=True)
+    ]
+    return result

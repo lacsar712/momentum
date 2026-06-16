@@ -179,3 +179,14 @@ class DividendEvent(SQLModel, table=True):
     rights_price: float = Field(default=0.0)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     stock: Optional[Stock] = Relationship(back_populates="dividends")
+
+class AnomalyEvent(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    symbol: str = Field(index=True)
+    name: str = Field(index=True)
+    rule_id: str = Field(index=True)
+    rule_name: str = Field(index=True)
+    trigger_date: date = Field(index=True)
+    strength_score: float = Field(index=True)
+    metrics_json: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)

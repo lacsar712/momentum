@@ -241,3 +241,60 @@ class StockFactorTimeseriesRequest(BaseModel):
     symbol: str
     start_date: date
     end_date: date
+
+class AnomalyRuleParam(BaseModel):
+    key: str
+    label: str
+    type: str
+    default: Any
+    min: Optional[float] = None
+    max: Optional[float] = None
+    step: Optional[float] = None
+    unit: Optional[str] = None
+    options: Optional[List[Dict[str, Any]]] = None
+
+class AnomalyRuleDef(BaseModel):
+    id: str
+    name: str
+    description: str
+    params: List[AnomalyRuleParam]
+    default_enabled: bool
+
+class AnomalyRuleConfig(BaseModel):
+    enabled: bool = True
+    params: Dict[str, Any] = Field(default_factory=dict)
+
+class AnomalyScanRequest(BaseModel):
+    symbols: Optional[List[str]] = None
+    start_date: date
+    end_date: date
+    rule_configs: Dict[str, AnomalyRuleConfig] = Field(default_factory=dict)
+
+class AnomalyEventItem(BaseModel):
+    id: Optional[int] = None
+    symbol: str
+    name: str
+    rule_id: str
+    rule_name: str
+    trigger_date: date
+    strength_score: float
+    metrics: Dict[str, Any]
+    created_at: Optional[datetime] = None
+
+class AnomalyScanResponse(BaseModel):
+    total: int
+    items: List[AnomalyEventItem]
+
+class AnomalyEventFilter(BaseModel):
+    rule_id: Optional[str] = None
+    symbol: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    min_strength: Optional[float] = None
+    page: int = 1
+    page_size: int = 50
+
+class AnomalyStatItem(BaseModel):
+    rule_id: str
+    rule_name: str
+    count: int
