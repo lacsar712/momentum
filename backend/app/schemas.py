@@ -314,3 +314,48 @@ class LhbBrokerageRankingRequest(BaseModel):
 class LhbReasonAggRequest(BaseModel):
     start_date: date
     end_date: date
+
+class NewsSyncRequest(BaseModel):
+    symbol: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    news_type: Optional[str] = None
+
+class NewsQueryFilter(BaseModel):
+    keyword: Optional[str] = None
+    news_type: Optional[str] = None
+    symbol: Optional[List[str]] = None
+    sector: Optional[List[str]] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    page: int = 1
+    page_size: int = 20
+
+class NewsItemResponse(BaseModel):
+    id: int
+    source: str
+    symbol: Optional[str] = None
+    stock_name: Optional[str] = None
+    sector: Optional[str] = None
+    title: str
+    url: str
+    publish_time: datetime
+    summary: Optional[str] = None
+    news_type: str
+    created_at: datetime
+
+class NewsListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[NewsItemResponse]
+
+class HotStockItem(BaseModel):
+    symbol: str
+    name: str
+    news_count: int
+
+class HotStocksResponse(BaseModel):
+    date: str
+    top_n: int
+    items: List[HotStockItem]

@@ -66,6 +66,14 @@ from app.services.lhb import (
     query_brokerage_ranking,
     query_reason_aggregation,
 )
+from app.services.news import (
+    sync_news_range,
+    query_news,
+    get_news_detail,
+    get_hot_stocks,
+    get_news_by_symbol,
+    NEWS_TYPES,
+)
 from app.services.mock_trading import (
     get_account_summary as mt_get_account_summary,
     place_order as mt_place_order,
@@ -76,7 +84,7 @@ from app.services.mock_trading import (
     get_portfolio_nav as mt_get_portfolio_nav,
     reset_account as mt_reset_account,
 )
-from app.schemas import MockOrderRequest, FactorDistributionRequest, FactorLayeredBacktestRequest, FactorCorrelationRequest, StockFactorTimeseriesRequest
+from app.schemas import MockOrderRequest, FactorDistributionRequest, FactorLayeredBacktestRequest, FactorCorrelationRequest, StockFactorTimeseriesRequest, NewsSyncRequest, NewsQueryFilter
 
 router = APIRouter(prefix="/api/v1")
 
@@ -1283,3 +1291,88 @@ def get_lhb_brokerage_ranking(payload: LhbBrokerageRankingRequest, session=Depen
 def get_lhb_reason_aggregation(payload: LhbReasonAggRequest, session=Depends(session_dep)):
     result = query_reason_aggregation(session, payload.start_date, payload.end_date)
     return {"total": len(result), "items": result}
+
+
+NEWS_SYNC_STATE = {
+    "status": "idle",
+    "current": 0,
+    "total": 0,
+    "message": "",
+}
+
+def _update_news_progress(current, total, message=""):
+    NEWS_SYNC_STATE["current"] = current
+    NEWS_SYNC_STATE["total"] = total
+    NEWS_SYNC_STATE["message"] = message
+
+@router.get("/news/sync/progress")
+def get_news_sync_progress():
+    return NEWS_SYNC_STATE
+
+@router.post("/news/sync")
+def sync_news_data(
+    payload: NewsSyncRequest,
+    background_tasks: BackgroundTasks,
+    session=Depends(session_dep),
+    user=Depends(admin_dep),
+):
+    if NEWS_SYNC_STATE["status"] == "running":
+        raise HTTPException(status_code=400, detail="资讯同步任务正在进行中")
+
+    def run_task():
+        global NEWS_SYNC_STATE
+        NEWS_SYNC_STATE.update({"status": "running", "current": 0, "total": 0, "message": "正在启动..."})
+        try:
+            with get_session() as sess:
+                symbols = [payload.symbol] if payload.symbol else None
+                count = sync_news_range(
+                    sess,
+                    symbols=symbols,
+                    start_date=payload.start_date,
+                    end_date=payload.end_date,
+                    news_type=payload.news_type,
+                    progress_callback=_update_news_progress,
+                )
+                NEWS_SYNC_STATE.update({"status": "finished", "current": 1, "total": 1, "message": f"同步完成，共入库 {count} 条记录"})
+        except Exception as e:
+            print(f"News sync failed: {e}")
+            import traceback
+            traceback.print_exc()
+            NEWS_SYNC_STATE.update({"status": "error", "message": f"同步失败: {str(e)}"})
+
+    background_tasks.add_task(run_task)
+    return {"status": "started", "message": "资讯数据同步已启动"}
+
+@router.post("/news/query")
+def query_news_items(payload: NewsQueryFilter, session=Depends(session_dep)):
+    return query_news(
+        session,
+        keyword=payload.keyword,
+        news_type=payload.news_type,
+        symbols=payload.symbol,
+        sectors=payload.sector,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        page=payload.page,
+        page_size=payload.page_size,
+    )
+
+@router.get("/news/types")
+def list_news_types():
+    return {"types": NEWS_TYPES}
+
+@router.get("/news/{news_id}")
+def get_single_news(news_id: int, session=Depends(session_dep)):
+    item = get_news_detail(session, news_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="资讯不存在")
+    return item
+
+@router.get("/news/hot/stocks")
+def get_hot_stocks_api(top_n: int = 20, date: Optional[date] = None, session=Depends(session_dep)):
+    return get_hot_stocks(session, top_n=top_n, target_date=date)
+
+@router.get("/news/stock/{symbol}")
+def get_news_for_stock(symbol: str, limit: int = 10, session=Depends(session_dep)):
+    items = get_news_by_symbol(session, symbol, limit)
+    return {"symbol": symbol, "total": len(items), "items": items}

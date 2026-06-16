@@ -202,3 +202,16 @@ class LhbRecord(SQLModel, table=True):
     net_buy_amount: Optional[float] = None
     total_amount: Optional[float] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NewsItem(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    source: str = Field(index=True)
+    symbol: Optional[str] = Field(default=None, index=True)
+    sector: Optional[str] = Field(default=None, index=True)
+    title: str = Field(index=True)
+    url: str
+    publish_time: datetime = Field(index=True)
+    summary: Optional[str] = Field(default=None)
+    news_type: str = Field(index=True)
+    raw_html: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)

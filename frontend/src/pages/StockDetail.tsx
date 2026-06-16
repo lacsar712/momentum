@@ -5,6 +5,7 @@ import {
     ArrowLeft, Star, BarChart3, ScanLine, Copy, Check,
     TrendingUp, TrendingDown, Activity, Zap, Waves,
     DollarSign, TrendingUp as TrendingUpIcon, AlertCircle,
+    Newspaper, ExternalLink, Clock,
 } from 'lucide-react'
 import Loading from '../components/Loading'
 import { api } from '../lib/api'
@@ -72,6 +73,20 @@ interface PatternRecord {
     score: number | null
 }
 
+interface NewsItem {
+    id: number
+    source: string
+    symbol: string | null
+    stock_name: string | null
+    sector: string | null
+    title: string
+    url: string
+    publish_time: string
+    summary: string | null
+    news_type: string
+    created_at: string
+}
+
 interface StockDetailResponse {
     basic_info: StockBasicInfo
     quote: StockQuoteSnapshot
@@ -89,9 +104,12 @@ export default function StockDetail() {
 
     const [loading, setLoading] = useState(true)
     const [data, setData] = useState<StockDetailResponse | null>(null)
-    const [activeTab, setActiveTab] = useState<'financial' | 'factors' | 'patterns'>('financial')
+    const [activeTab, setActiveTab] = useState<'financial' | 'factors' | 'patterns' | 'news'>('financial')
     const [copied, setCopied] = useState(false)
     const [inWatchlist, setInWatchlist] = useState(false)
+
+    const [stockNews, setStockNews] = useState<NewsItem[]>([])
+    const [stockNewsLoading, setStockNewsLoading] = useState(false)
 
     useEffect(() => {
         if (!symbol) return
@@ -108,6 +126,37 @@ export default function StockDetail() {
                 pushToast('获取股票详情失败', 'error')
             })
             .finally(() => setLoading(false))
+    }
+
+    const fetchStockNews = () => {
+        if (!symbol) return
+        setStockNewsLoading(true)
+        api.get(`/news/stock/${symbol}`, { params: { limit: 20 } })
+            .then((res) => {
+                setStockNews(res.data.items || [])
+            })
+            .catch(() => {})
+            .finally(() => setStockNewsLoading(false))
+    }
+
+    useEffect(() => {
+        if (activeTab === 'news' && symbol) {
+            fetchStockNews()
+        }
+    }, [activeTab, symbol])
+
+    const formatPublishTime = (iso: string): string => {
+        if (!iso) return ''
+        const date = new Date(iso)
+        return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+    }
+
+    const getNewsTypeColor = (type: string) => {
+        switch (type) {
+            case '公告': return 'bg-blue-50 text-blue-700 border-blue-200'
+            case '研报': return 'bg-purple-50 text-purple-700 border-purple-200'
+            default: return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        }
     }
 
     const copySymbol = () => {
@@ -534,6 +583,22 @@ export default function StockDetail() {
                                     </span>
                                 )}
                             </button>
+                            <button
+                                onClick={() => setActiveTab('news')}
+                                className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                                    activeTab === 'news'
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                <Newspaper size={14} className="inline mr-1" />
+                                资讯
+                                {stockNews.length > 0 && (
+                                    <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-500 text-white rounded-full">
+                                        {stockNews.length}
+                                    </span>
+                                )}
+                            </button>
                         </div>
 
                         <div className="p-5">
@@ -675,6 +740,77 @@ export default function StockDetail() {
                                 <div className="text-center py-8 text-slate-400">
                                     <ScanLine size={32} className="mx-auto mb-2 opacity-50" />
                                     <p className="text-sm">近30天无形态触发</p>
+                                </div>
+                            )}
+
+                            {activeTab === 'news' && (
+                                <div>
+                                    {stockNewsLoading ? (
+                                        <div className="py-8">
+                                            <Loading />
+                                        </div>
+                                    ) : stockNews.length === 0 ? (
+                                        <div className="text-center py-8 text-slate-400">
+                                            <Newspaper size={32} className="mx-auto mb-2 opacity-50" />
+                                            <p className="text-sm">暂无相关资讯</p>
+                                            <p className="text-xs text-slate-300 mt-1">请先在资讯中心同步数据</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
+                                            {stockNews.map((item) => (
+                                                <div
+                                                    key={item.id}
+                                                    className="rounded-xl border border-slate-100 p-3 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group"
+                                                    onClick={() => {
+                                                        if (item.url) {
+                                                            window.open(item.url, '_blank')
+                                                        }
+                                                    }}
+                                                >
+                                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                                        <h4 className="text-sm font-semibold text-slate-800 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
+                                                            {item.title}
+                                                        </h4>
+                                                        {item.url && (
+                                                            <ExternalLink size={12} className="text-slate-300 group-hover:text-primary shrink-0 mt-1 transition-colors" />
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${getNewsTypeColor(item.news_type)}`}>
+                                                            {item.news_type}
+                                                        </span>
+                                                        <span className="text-xs text-slate-400">
+                                                            {item.source}
+                                                        </span>
+                                                    </div>
+
+                                                    {item.summary && (
+                                                        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                                                            {item.summary}
+                                                        </p>
+                                                    )}
+
+                                                    <div className="mt-2 flex items-center gap-1 text-xs text-slate-400">
+                                                        <Clock size={10} />
+                                                        {formatPublishTime(item.publish_time)}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {stockNews.length > 0 && (
+                                        <div className="mt-4 pt-3 border-t border-slate-100">
+                                            <button
+                                                onClick={() => navigate('/news')}
+                                                className="w-full text-xs text-primary hover:text-primary/80 font-medium flex items-center justify-center gap-1 transition-colors"
+                                            >
+                                                查看全部资讯
+                                                <Newspaper size={12} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
