@@ -161,11 +161,27 @@ def query_lhb_by_symbol(session: Session, symbol: str, limit: int = 50) -> List[
 
 
 def query_lhb_by_brokerage(
-    session: Session, brokerage_name: str, recent_days: int = 30
+    session: Session,
+    brokerage_name: str,
+    recent_days: Optional[int] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
 ) -> List[Dict[str, Any]]:
-    cutoff = date.today() - timedelta(days=recent_days)
+    if start_date and end_date:
+        pass
+    elif recent_days:
+        start_date = date.today() - timedelta(days=recent_days)
+        end_date = date.today()
+    else:
+        recent_days = 30
+        start_date = date.today() - timedelta(days=recent_days)
+        end_date = date.today()
+
     all_records = session.exec(
-        select(LhbRecord).where(LhbRecord.trade_date >= cutoff)
+        select(LhbRecord).where(
+            LhbRecord.trade_date >= start_date,
+            LhbRecord.trade_date <= end_date,
+        )
     ).all()
 
     results = []

@@ -176,7 +176,10 @@ export default function Lhb() {
         if (!brokerageDateRange.start || !brokerageDateRange.end) return
         setBrokerageRankingLoading(true)
         try {
-            const res = await api.post('/lhb/brokerage/ranking', brokerageDateRange)
+            const res = await api.post('/lhb/brokerage/ranking', {
+                start_date: brokerageDateRange.start,
+                end_date: brokerageDateRange.end,
+            })
             setBrokerageRanking(res.data.items || [])
         } catch {
             pushToast('加载营业部排行失败', 'error')
@@ -189,7 +192,11 @@ export default function Lhb() {
         setSelectedBrokerage(name)
         setBrokerageDetailLoading(true)
         try {
-            const res = await api.post('/lhb/brokerage', { brokerage_name: name, recent_days: 30 })
+            const res = await api.post('/lhb/brokerage', {
+                brokerage_name: name,
+                start_date: brokerageDateRange.start,
+                end_date: brokerageDateRange.end,
+            })
             setBrokerageDetail(res.data.items || [])
         } catch {
             pushToast('加载营业部明细失败', 'error')
@@ -202,7 +209,10 @@ export default function Lhb() {
         if (!reasonDateRange.start || !reasonDateRange.end) return
         setReasonLoading(true)
         try {
-            const res = await api.post('/lhb/reason/aggregation', reasonDateRange)
+            const res = await api.post('/lhb/reason/aggregation', {
+                start_date: reasonDateRange.start,
+                end_date: reasonDateRange.end,
+            })
             setReasonAgg(res.data.items || [])
         } catch {
             pushToast('加载原因聚合数据失败', 'error')
@@ -217,7 +227,10 @@ export default function Lhb() {
             return
         }
         setSyncing(true)
-        api.post('/lhb/sync', syncDateRange)
+        api.post('/lhb/sync', {
+            start_date: syncDateRange.start,
+            end_date: syncDateRange.end,
+        })
             .then(() => {
                 setSyncProgress({ status: 'running', current: 0, total: 0, message: '正在启动...' })
                 pushToast('龙虎榜数据同步已启动', 'info')
@@ -543,7 +556,9 @@ export default function Lhb() {
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-bold text-slate-900">{selectedBrokerage}</h3>
-                                    <p className="text-xs text-slate-500">近 30 日关联上榜股票</p>
+                                    <p className="text-xs text-slate-500">
+                                        {brokerageDateRange.start} ~ {brokerageDateRange.end} 关联上榜股票
+                                    </p>
                                 </div>
                             </div>
                             {brokerageDetailLoading ? (

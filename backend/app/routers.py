@@ -1306,7 +1306,13 @@ def get_lhb_by_symbol(symbol: str, limit: int = 50, session=Depends(session_dep)
 
 @router.post("/lhb/brokerage")
 def get_lhb_by_brokerage(payload: LhbBrokerageQuery, session=Depends(session_dep)):
-    records = query_lhb_by_brokerage(session, payload.brokerage_name, payload.recent_days)
+    records = query_lhb_by_brokerage(
+        session,
+        payload.brokerage_name,
+        recent_days=payload.recent_days,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+    )
     return {"brokerage_name": payload.brokerage_name, "total": len(records), "items": records}
 
 @router.post("/lhb/brokerage/ranking")

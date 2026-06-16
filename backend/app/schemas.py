@@ -305,7 +305,9 @@ class LhbSyncRequest(BaseModel):
 
 class LhbBrokerageQuery(BaseModel):
     brokerage_name: str
-    recent_days: int = Field(default=30)
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    recent_days: Optional[int] = None
 
 class LhbBrokerageRankingRequest(BaseModel):
     start_date: date
