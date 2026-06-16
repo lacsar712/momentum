@@ -71,20 +71,19 @@ def adjust_prices(
 
 def _apply_adjust(df: pd.DataFrame, events: List[DividendEvent], mode: str) -> pd.DataFrame:
     df = df.copy()
-    date_close = dict(zip(df["trade_date"].dt.strftime("%Y-%m-%d"), df["close"]))
     sorted_events = sorted(events, key=lambda e: e.ex_date)
 
     event_factors: Dict[str, float] = {}
     for ev in sorted_events:
         ev_str = ev.ex_date.isoformat()
-        prev_close = _find_prev_close(df, ev.ex_date, date_close)
+        prev_close = _find_prev_close(df, ev.ex_date)
         if prev_close is not None:
             event_factors[ev_str] = _ex_adjust_factor(prev_close, ev)
         else:
             event_factors[ev_str] = 1.0
 
+    factors = [1.0] * len(df)
     if mode == "hfq":
-        factors = [1.0] * len(df)
         cum = 1.0
         for i in range(len(df)):
             dt_str = df.iloc[i]["trade_date"].strftime("%Y-%m-%d")
@@ -92,15 +91,12 @@ def _apply_adjust(df: pd.DataFrame, events: List[DividendEvent], mode: str) -> p
                 cum *= event_factors[dt_str]
             factors[i] = cum
     elif mode == "qfq":
-        factors = [1.0] * len(df)
         cum = 1.0
         for i in range(len(df) - 1, -1, -1):
             dt_str = df.iloc[i]["trade_date"].strftime("%Y-%m-%d")
-            if dt_str in event_factors:
-                cum *= event_factors[dt_str]
             factors[i] = cum
-    else:
-        factors = [1.0] * len(df)
+            if dt_str in event_factors:
+                cum /= event_factors[dt_str]
 
     df["open"] = (df["open"] * factors).round(4)
     df["high"] = (df["high"] * factors).round(4)
@@ -109,7 +105,7 @@ def _apply_adjust(df: pd.DataFrame, events: List[DividendEvent], mode: str) -> p
     return df
 
 
-def _find_prev_close(df: pd.DataFrame, ex_date: date, date_close: Dict[str, float]) -> float | None:
+def _find_prev_close(df: pd.DataFrame, ex_date: date) -> float | None:
     target = pd.Timestamp(ex_date)
     prev_rows = df[df["trade_date"] < target]
     if prev_rows.empty:

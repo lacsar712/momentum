@@ -50,6 +50,8 @@ export default function Visual() {
 
     const [freq, setFreq] = useState('D')
     const [adjust, setAdjust] = useState('none')
+    const [loadedAdjust, setLoadedAdjust] = useState('none')
+    const [loadedFreq, setLoadedFreq] = useState('D')
     const [indicators, setIndicators] = useState({
         ma5: true,
         ma20: true,
@@ -94,6 +96,8 @@ export default function Visual() {
             .then((res: AxiosResponse<{ prices: PriceItem[]; dividend_events: DividendEventItem[] }>) => {
                 setPrices(res.data.prices)
                 setDividendEvents(res.data.dividend_events)
+                setLoadedAdjust(adjust)
+                setLoadedFreq(freq)
             })
             .catch(() => pushToast('K线数据加载失败', 'error'))
             .finally(() => setLoading(false))
@@ -109,6 +113,12 @@ export default function Visual() {
     useEffect(() => {
         if (symbol) fetchDividendEvents()
     }, [symbol])
+
+    useEffect(() => {
+        if (prices.length > 0 && !loading) {
+            fetchKline()
+        }
+    }, [adjust, freq])
 
     const handleEntrySubmit = () => {
         if (!entryForm.ex_date) {
@@ -128,6 +138,9 @@ export default function Visual() {
                 setEntryForm({ ex_date: '', cash_dividend: '', bonus_ratio: '', rights_ratio: '', rights_price: '' })
                 setShowEntryPanel(false)
                 fetchDividendEvents()
+                if (prices.length > 0) {
+                    fetchKline()
+                }
             })
             .catch(() => pushToast('录入失败', 'error'))
     }
@@ -137,6 +150,9 @@ export default function Visual() {
             .then(() => {
                 pushToast('已删除', 'success')
                 fetchDividendEvents()
+                if (prices.length > 0) {
+                    fetchKline()
+                }
             })
             .catch(() => pushToast('删除失败', 'error'))
     }
@@ -371,9 +387,9 @@ export default function Visual() {
                     <input type="checkbox" checked={indicators.volume} onChange={(e) => setIndicators(p => ({ ...p, volume: e.target.checked }))} className="rounded border-border text-primary" />
                     <span>成交量</span>
                 </label>
-                {adjust !== 'none' && (
+                {loadedAdjust !== 'none' && (
                     <span className="ml-auto text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
-                        {adjust === 'qfq' ? '前复权' : '后复权'}模式：所有价格已调整
+                        {loadedAdjust === 'qfq' ? '前复权' : '后复权'}模式：所有价格已调整
                     </span>
                 )}
             </div>
