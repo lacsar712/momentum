@@ -139,8 +139,10 @@ export default function Anomaly() {
                 api.get('/anomaly/scan/progress')
                     .then((res: AxiosResponse<ScanProgress>) => {
                         setScanProgress(res.data)
-                        if (res.data.status === 'finished' && res.data.results.length > 0) {
+                        if (res.data.results && res.data.results.length > 0) {
                             setScanResults(res.data.results)
+                        }
+                        if (res.data.status === 'finished') {
                             pushToast(`扫描完成，共发现 ${res.data.results.length} 个异动事件`, 'success')
                             loadStats()
                             loadHistoricalEvents()
@@ -560,11 +562,16 @@ export default function Anomaly() {
                         </button>
                     </div>
 
-                    {scanResults.length > 0 && (
+                    {(scanProgress.status === 'running' || scanResults.length > 0) && (
                         <div className="space-y-3">
                             <h3 className="text-lg font-semibold flex items-center gap-2">
                                 <AlertTriangle size={20} className="text-amber-500" />
-                                扫描结果 ({scanResults.length} 个事件)
+                                {scanProgress.status === 'running' ? '实时扫描结果' : '扫描结果'}
+                                <span className="text-sm font-normal text-slate-500">
+                                    （已发现 {scanResults.length} 个事件
+                                    {scanProgress.status === 'running' && scanProgress.total > 0 && `，扫描进度 ${scanProgress.current}/${scanProgress.total}`}
+                                    ）
+                                </span>
                             </h3>
                             <div className="rounded-2xl border border-border bg-card overflow-hidden">
                                 <div className="overflow-x-auto">
@@ -579,25 +586,35 @@ export default function Anomaly() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {scanResults.slice(0, 50).map((event, idx) => (
-                                                <tr key={idx} className="hover:bg-slate-50/50">
-                                                    <td className="px-4 py-3 text-sm font-mono text-slate-600">
-                                                        {event.trigger_date}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <StockNameLink symbol={event.symbol} name={event.name} />
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-slate-700">{event.rule_name}</td>
-                                                    <td className="px-4 py-3">
-                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${getStrengthColor(event.strength_score)}`}>
-                                                            {getStrengthLabel(event.strength_score)} ({(event.strength_score * 100).toFixed(0)}%)
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-xs text-slate-500 max-w-md truncate" title={formatMetrics(event.metrics)}>
-                                                        {formatMetrics(event.metrics)}
+                                            {scanResults.length === 0 && scanProgress.status === 'running' ? (
+                                                <tr>
+                                                    <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
+                                                        <RefreshCw size={32} className="mx-auto mb-3 animate-spin text-primary opacity-70" />
+                                                        <p className="text-sm">正在扫描中，暂未发现异动事件...</p>
+                                                        <p className="text-xs mt-1 text-slate-400">每发现新的异动会实时更新在此处</p>
                                                     </td>
                                                 </tr>
-                                            ))}
+                                            ) : (
+                                                scanResults.slice(0, 50).map((event, idx) => (
+                                                    <tr key={idx} className="hover:bg-slate-50/50">
+                                                        <td className="px-4 py-3 text-sm font-mono text-slate-600">
+                                                            {event.trigger_date}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <StockNameLink symbol={event.symbol} name={event.name} />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-slate-700">{event.rule_name}</td>
+                                                        <td className="px-4 py-3">
+                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${getStrengthColor(event.strength_score)}`}>
+                                                                {getStrengthLabel(event.strength_score)} ({(event.strength_score * 100).toFixed(0)}%)
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-xs text-slate-500 max-w-md truncate" title={formatMetrics(event.metrics)}>
+                                                            {formatMetrics(event.metrics)}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>

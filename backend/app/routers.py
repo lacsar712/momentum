@@ -1156,6 +1156,13 @@ def scan_anomalies(
         try:
             with get_session() as sess:
                 rule_configs = {k: v.dict() for k, v in payload.rule_configs.items()}
+
+                def _on_stock_results(stock_results):
+                    current_results = ANOMALY_SCAN_STATE.get("results", [])
+                    current_results.extend(stock_results)
+                    current_results.sort(key=lambda x: x["strength_score"], reverse=True)
+                    ANOMALY_SCAN_STATE["results"] = current_results
+
                 results = scan_market_anomalies(
                     sess,
                     rule_configs,
@@ -1163,6 +1170,7 @@ def scan_anomalies(
                     start_date=payload.start_date,
                     end_date=payload.end_date,
                     progress_callback=_update_anomaly_progress,
+                    stock_callback=_on_stock_results,
                 )
 
                 results.sort(key=lambda x: x["strength_score"], reverse=True)

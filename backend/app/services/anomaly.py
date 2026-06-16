@@ -539,9 +539,11 @@ def scan_market_anomalies(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    stock_callback: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
 ) -> List[Dict[str, Any]]:
     """
     扫描全市场或指定股票池的异动事件
+    stock_callback: 每扫描完一只股票的回调，参数为该股票发现的异动结果列表
     """
     from app.models import Stock, DailyPrice
     from sqlmodel import select
@@ -562,14 +564,14 @@ def scan_market_anomalies(
         ).all()
 
         if not prices:
+            if progress_callback and (idx + 1) % 10 == 0:
+                progress_callback(idx + 1, total, f"正在扫描 {stock.symbol} {stock.name}")
             continue
 
         df = pd.DataFrame([p.dict() for p in prices])
 
-        # 确保有足够的数据窗口
         max_lookback = 250
         if len(df) < max_lookback:
-            # 对于数据不足的股票，减少回看窗口但仍进行扫描
             pass
 
         stock_results = scan_stock_anomalies(df, rule_configs, start_date, end_date)
@@ -578,6 +580,9 @@ def scan_market_anomalies(
             result["symbol"] = stock.symbol
             result["name"] = stock.name
             all_results.append(result)
+
+        if stock_callback and stock_results:
+            stock_callback(stock_results)
 
         if progress_callback and (idx + 1) % 10 == 0:
             progress_callback(idx + 1, total, f"正在扫描 {stock.symbol} {stock.name}")
