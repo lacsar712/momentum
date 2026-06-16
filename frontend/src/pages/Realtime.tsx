@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
     Zap, Grid3X3, List, Play, Pause, RefreshCw, X, Plus,
     TrendingUp, TrendingDown, Search, Star, Check, Loader2,
@@ -35,6 +36,7 @@ interface WatchGroupType {
 const POLL_INTERVAL = 3000
 
 export default function Realtime() {
+    const navigate = useNavigate()
     const { pushToast } = useToast()
 
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
@@ -102,10 +104,10 @@ export default function Realtime() {
     }, [isPaused, selectedSymbols, fetchQuotes])
 
     useEffect(() => {
-        if (selectedSymbols.length > 0) {
+        if (selectedSymbols.length > 0 && !isPaused) {
             fetchQuotes()
         }
-    }, [selectedSymbols])
+    }, [selectedSymbols, isPaused, fetchQuotes])
 
     useEffect(() => {
         api.get('/watchlist/groups').then(res => {
@@ -140,9 +142,28 @@ export default function Realtime() {
             .finally(() => setPickerLoading(false))
     }
 
-    const addStock = (symbol: string) => {
+    const addStock = (symbol: string, stockName?: string) => {
         if (selectedSymbols.includes(symbol)) return
         setSelectedSymbols(prev => [...prev, symbol])
+        if (isPaused && stockName) {
+            setQuotes(prev => [...prev, {
+                symbol,
+                name: stockName,
+                price: 0,
+                prev_close: 0,
+                open: 0,
+                change: 0,
+                change_percent: 0,
+                bid1_price: 0,
+                bid1_volume: 0,
+                ask1_price: 0,
+                ask1_volume: 0,
+                volume: 0,
+                amount: 0,
+                timestamp: '',
+                source: '',
+            }])
+        }
         pushToast(`已添加 ${symbol}`, 'success')
     }
 
@@ -161,9 +182,30 @@ export default function Realtime() {
         try {
             const res = await api.get(`/watchlist/groups/${groupId}/items`)
             const items = res.data.items || []
-            const symbols = items.map((item: any) => item.symbol).filter((s: string) => !selectedSymbols.includes(s))
+            const newItems = items.filter((item: any) => !selectedSymbols.includes(item.symbol))
+            const symbols = newItems.map((item: any) => item.symbol)
             if (symbols.length > 0) {
                 setSelectedSymbols(prev => [...prev, ...symbols])
+                if (isPaused) {
+                    const placeholders = newItems.map((item: any) => ({
+                        symbol: item.symbol,
+                        name: item.name,
+                        price: 0,
+                        prev_close: 0,
+                        open: 0,
+                        change: 0,
+                        change_percent: 0,
+                        bid1_price: 0,
+                        bid1_volume: 0,
+                        ask1_price: 0,
+                        ask1_volume: 0,
+                        volume: 0,
+                        amount: 0,
+                        timestamp: '',
+                        source: '',
+                    }))
+                    setQuotes(prev => [...prev, ...placeholders])
+                }
                 pushToast(`已导入 ${symbols.length} 只股票`, 'success')
             } else {
                 pushToast('自选股已全部添加', 'info')
@@ -198,6 +240,10 @@ export default function Realtime() {
             : 'bg-emerald-50/60 ring-2 ring-emerald-300/50'
     }
 
+    const hasQuoteData = (quote: QuoteItem | undefined) => {
+        return quote && quote.timestamp !== ''
+    }
+
     const quoteMap: Record<string, QuoteItem> = {}
     quotes.forEach(q => { quoteMap[q.symbol] = q })
 
@@ -227,7 +273,13 @@ export default function Realtime() {
                         刷新
                     </button>
                     <button
-                        onClick={() => setIsPaused(!isPaused)}
+                        onClick={() => {
+                            const nextPaused = !isPaused
+                            setIsPaused(nextPaused)
+                            if (!nextPaused && selectedSymbols.length > 0) {
+                                fetchQuotes()
+                            }
+                        }}
                         className={`h-9 px-3 flex items-center gap-1.5 rounded-lg text-sm font-medium transition-colors ${
                             isPaused
                                 ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
@@ -294,7 +346,7 @@ export default function Realtime() {
                                         return (
                                             <div
                                                 key={stock.symbol}
-                                                onClick={() => !isAdded && addStock(stock.symbol)}
+                                                onClick={() => !isAdded && addStock(stock.symbol, stock.name)}
                                                 className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${
                                                     isAdded ? 'bg-primary/5 cursor-default' : 'hover:bg-slate-50 cursor-pointer'
                                                 }`}
@@ -377,17 +429,19 @@ export default function Realtime() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {selectedSymbols.map(symbol => {
                         const quote = quoteMap[symbol]
-                        const flashClass = getFlashClass(symbol)
-                        const isUp = quote ? quote.change >= 0 : false
+                        const hasData = hasQuoteData(quote)
+                        const flashClass = hasData ? getFlashClass(symbol) : ''
+                        const isUp = hasData && quote!.change >= 0
 
                         return (
                             <div
                                 key={symbol}
-                                className={`group relative rounded-2xl bg-white border border-slate-200/60 shadow-sm p-5 transition-all duration-300 hover:shadow-md hover:border-slate-300 ${flashClass}`}
+                                onClick={() => navigate(`/visual?symbol=${symbol}`)}
+                                className={`group relative rounded-2xl bg-white border border-slate-200/60 shadow-sm p-5 cursor-pointer transition-all duration-300 hover:shadow-md hover:border-slate-300 ${flashClass}`}
                             >
                                 <button
                                     onClick={(e) => { e.stopPropagation(); removeStock(symbol) }}
-                                    className="absolute top-3 right-3 h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                                    className="absolute top-3 right-3 h-7 w-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 z-10"
                                     title="移除"
                                 >
                                     <X size={14} />
@@ -396,17 +450,17 @@ export default function Realtime() {
                                 <div className="mb-3">
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-lg font-bold text-slate-900">{symbol}</span>
-                                        <StockNameLink symbol={symbol} name={quote?.name || '-'} className="text-sm" />
+                                        <StockNameLink symbol={symbol} name={quote?.name || '-'} className="text-sm" target="kline" />
                                     </div>
                                 </div>
 
                                 <div className="mb-3">
-                                    <div className={`text-3xl font-bold tracking-tight ${isUp ? 'text-red-600' : 'text-emerald-600'}`}>
-                                        {quote ? quote.price.toFixed(2) : '--'}
+                                    <div className={`text-3xl font-bold tracking-tight ${hasData ? (isUp ? 'text-red-600' : 'text-emerald-600') : 'text-slate-400'}`}>
+                                        {hasData ? quote!.price.toFixed(2) : '--'}
                                     </div>
                                     <div className="mt-1">
-                                        {quote ? renderChangeBadge(quote.change, quote.change_percent) : (
-                                            <span className="text-sm text-slate-400">加载中...</span>
+                                        {hasData ? renderChangeBadge(quote!.change, quote!.change_percent) : (
+                                            <span className="text-sm text-slate-400">{isPaused ? '已暂停' : '加载中...'}</span>
                                         )}
                                     </div>
                                 </div>
@@ -414,19 +468,27 @@ export default function Realtime() {
                                 <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-slate-100">
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">买一</span>
-                                        <span className="font-medium text-emerald-600">{quote?.bid1_price.toFixed(2) || '-'}</span>
+                                        <span className={`font-medium ${hasData ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                            {hasData ? quote!.bid1_price.toFixed(2) : '-'}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">卖一</span>
-                                        <span className="font-medium text-red-600">{quote?.ask1_price.toFixed(2) || '-'}</span>
+                                        <span className={`font-medium ${hasData ? 'text-red-600' : 'text-slate-400'}`}>
+                                            {hasData ? quote!.ask1_price.toFixed(2) : '-'}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">成交量</span>
-                                        <span className="font-medium text-slate-600">{quote ? formatVolume(quote.volume) : '-'}</span>
+                                        <span className="font-medium text-slate-600">
+                                            {hasData ? formatVolume(quote!.volume) : '-'}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-slate-400">成交额</span>
-                                        <span className="font-medium text-slate-600">{quote ? formatVolume(quote.amount) : '-'}</span>
+                                        <span className="font-medium text-slate-600">
+                                            {hasData ? formatVolume(quote!.amount) : '-'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -452,35 +514,37 @@ export default function Realtime() {
                         <tbody className="divide-y divide-slate-100">
                             {selectedSymbols.map(symbol => {
                                 const quote = quoteMap[symbol]
-                                const flashClass = getFlashClass(symbol)
-                                const isUp = quote ? quote.change >= 0 : false
+                                const hasData = hasQuoteData(quote)
+                                const flashClass = hasData ? getFlashClass(symbol) : ''
+                                const isUp = hasData && quote!.change >= 0
 
                                 return (
                                     <tr
                                         key={symbol}
-                                        className={`hover:bg-slate-50/80 transition-colors ${flashClass}`}
+                                        onClick={() => navigate(`/visual?symbol=${symbol}`)}
+                                        className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${flashClass}`}
                                     >
                                         <td className="px-4 py-3 text-sm font-medium text-slate-900">{symbol}</td>
                                         <td className="px-4 py-3">
-                                            <StockNameLink symbol={symbol} name={quote?.name || '-'} />
+                                            <StockNameLink symbol={symbol} name={quote?.name || '-'} target="kline" />
                                         </td>
-                                        <td className={`px-4 py-3 text-sm text-right font-bold ${isUp ? 'text-red-600' : 'text-emerald-600'}`}>
-                                            {quote ? quote.price.toFixed(2) : '--'}
+                                        <td className={`px-4 py-3 text-sm text-right font-bold ${hasData ? (isUp ? 'text-red-600' : 'text-emerald-600') : 'text-slate-400'}`}>
+                                            {hasData ? quote!.price.toFixed(2) : '--'}
                                         </td>
-                                        <td className={`px-4 py-3 text-sm text-right font-medium ${isUp ? 'text-red-600' : 'text-emerald-600'}`}>
-                                            {quote ? `${isUp ? '+' : ''}${quote.change.toFixed(2)}` : '--'}
+                                        <td className={`px-4 py-3 text-sm text-right font-medium ${hasData ? (isUp ? 'text-red-600' : 'text-emerald-600') : 'text-slate-400'}`}>
+                                            {hasData ? `${isUp ? '+' : ''}${quote!.change.toFixed(2)}` : '--'}
                                         </td>
-                                        <td className={`px-4 py-3 text-sm text-right font-medium ${isUp ? 'text-red-600' : 'text-emerald-600'}`}>
-                                            {quote ? `${isUp ? '+' : ''}${quote.change_percent.toFixed(2)}%` : '--'}
+                                        <td className={`px-4 py-3 text-sm text-right font-medium ${hasData ? (isUp ? 'text-red-600' : 'text-emerald-600') : 'text-slate-400'}`}>
+                                            {hasData ? `${isUp ? '+' : ''}${quote!.change_percent.toFixed(2)}%` : '--'}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-right text-emerald-600 font-medium">
-                                            {quote?.bid1_price.toFixed(2) || '-'}
+                                        <td className={`px-4 py-3 text-sm text-right font-medium ${hasData ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                            {hasData ? quote!.bid1_price.toFixed(2) : '-'}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-right text-red-600 font-medium">
-                                            {quote?.ask1_price.toFixed(2) || '-'}
+                                        <td className={`px-4 py-3 text-sm text-right font-medium ${hasData ? 'text-red-600' : 'text-slate-400'}`}>
+                                            {hasData ? quote!.ask1_price.toFixed(2) : '-'}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-right text-slate-600">
-                                            {quote ? formatVolume(quote.volume) : '-'}
+                                            {hasData ? formatVolume(quote!.volume) : '-'}
                                         </td>
                                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                                             <div className="flex items-center justify-center gap-1">
