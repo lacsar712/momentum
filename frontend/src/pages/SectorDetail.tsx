@@ -305,30 +305,33 @@ export default function SectorDetail() {
                             </div>
                             {detail?.top_gainers?.length ? (
                                 <div className="divide-y divide-slate-50">
-                                    {detail.top_gainers.map((stock, index) => (
-                                        <div
-                                            key={stock.symbol}
-                                            className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                                    index < 3 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'
-                                                }`}>
-                                                    {index + 1}
-                                                </span>
-                                                <div>
-                                                    <StockNameLink symbol={stock.symbol} name={stock.name} />
-                                                    <p className="text-xs text-slate-400">{stock.symbol}</p>
+                                    {detail.top_gainers.map((stock, index) => {
+                                        const isUp = stock.change_pct >= 0
+                                        return (
+                                            <div
+                                                key={stock.symbol}
+                                                className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                                        index < 3 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'
+                                                    }`}>
+                                                        {index + 1}
+                                                    </span>
+                                                    <div>
+                                                        <StockNameLink symbol={stock.symbol} name={stock.name} />
+                                                        <p className="text-xs text-slate-400">{stock.symbol}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className={`text-sm font-bold ${isUp ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                        {isUp ? '+' : ''}{stock.change_pct.toFixed(2)}%
+                                                    </p>
+                                                    <p className="text-xs text-slate-400">{formatMarketCap(stock.market_cap)}</p>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-sm font-bold text-red-600">
-                                                    +{stock.change_pct.toFixed(2)}%
-                                                </p>
-                                                <p className="text-xs text-slate-400">{formatMarketCap(stock.market_cap)}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             ) : (
                                 <div className="py-12 text-center text-slate-400 text-sm">暂无数据</div>
@@ -344,30 +347,33 @@ export default function SectorDetail() {
                             </div>
                             {detail?.top_losers?.length ? (
                                 <div className="divide-y divide-slate-50">
-                                    {detail.top_losers.map((stock, index) => (
-                                        <div
-                                            key={stock.symbol}
-                                            className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                                    index < 3 ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'
-                                                }`}>
-                                                    {index + 1}
-                                                </span>
-                                                <div>
-                                                    <StockNameLink symbol={stock.symbol} name={stock.name} />
-                                                    <p className="text-xs text-slate-400">{stock.symbol}</p>
+                                    {detail.top_losers.map((stock, index) => {
+                                        const isUp = stock.change_pct >= 0
+                                        return (
+                                            <div
+                                                key={stock.symbol}
+                                                className="px-6 py-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                                        index < 3 ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'
+                                                    }`}>
+                                                        {index + 1}
+                                                    </span>
+                                                    <div>
+                                                        <StockNameLink symbol={stock.symbol} name={stock.name} />
+                                                        <p className="text-xs text-slate-400">{stock.symbol}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className={`text-sm font-bold ${isUp ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                        {isUp ? '+' : ''}{stock.change_pct.toFixed(2)}%
+                                                    </p>
+                                                    <p className="text-xs text-slate-400">{formatMarketCap(stock.market_cap)}</p>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-sm font-bold text-emerald-600">
-                                                    {stock.change_pct.toFixed(2)}%
-                                                </p>
-                                                <p className="text-xs text-slate-400">{formatMarketCap(stock.market_cap)}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             ) : (
                                 <div className="py-12 text-center text-slate-400 text-sm">暂无数据</div>
