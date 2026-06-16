@@ -171,6 +171,62 @@ def sync_daily(session, symbols: list[str], start: date, end: date, sync_type: s
         progress_callback(total, total, "同步完成")
     return count
 
+def _calculate_yoy(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    计算财务数据的同比增速
+    匹配规则：找到去年同季度（同月同日）的数据进行比较
+    """
+    if df.empty:
+        return df
+    
+    df = df.copy()
+    df = df.sort_values("report_date").reset_index(drop=True)
+    
+    revenue_yoy_list = []
+    net_profit_yoy_list = []
+    
+    date_map = {}
+    for idx, row in df.iterrows():
+        rd = row["report_date"]
+        key = (rd.month, rd.day)
+        if key not in date_map:
+            date_map[key] = []
+        date_map[key].append((rd.year, idx))
+    
+    for key in date_map:
+        date_map[key].sort()
+    
+    for idx, row in df.iterrows():
+        rd = row["report_date"]
+        key = (rd.month, rd.day)
+        
+        last_year_idx = None
+        for year, i in date_map.get(key, []):
+            if year == rd.year - 1:
+                last_year_idx = i
+                break
+        
+        if last_year_idx is not None:
+            last_row = df.iloc[last_year_idx]
+            last_revenue = float(last_row.get("revenue", 0) or 0)
+            last_net_profit = float(last_row.get("net_profit", 0) or 0)
+            
+            curr_revenue = float(row.get("revenue", 0) or 0)
+            curr_net_profit = float(row.get("net_profit", 0) or 0)
+            
+            revenue_yoy = ((curr_revenue - last_revenue) / last_revenue) if last_revenue != 0 else None
+            net_profit_yoy = ((curr_net_profit - last_net_profit) / last_net_profit) if last_net_profit != 0 else None
+        else:
+            revenue_yoy = None
+            net_profit_yoy = None
+        
+        revenue_yoy_list.append(revenue_yoy)
+        net_profit_yoy_list.append(net_profit_yoy)
+    
+    df["revenue_yoy"] = revenue_yoy_list
+    df["net_profit_yoy"] = net_profit_yoy_list
+    return df
+
 def sync_financials(session, symbols: list[str]):
     sources = get_data_sources()
     fetcher = sources["akshare"]["financials"]
@@ -188,34 +244,136 @@ def sync_financials(session, symbols: list[str]):
             stock = session.exec(select(Stock).where(Stock.symbol == symbol)).first()
             if not stock:
                 continue
-                
-            # Upsert logic: simple delete existing for these dates or just add new
-            # For simplicity, we just add missing ones. 
-            # In production, we should check uniqueness. 
             
-            # Let's check most recent report date
-            last_metric = session.exec(select(FinancialMetric).where(FinancialMetric.stock_id == stock.id).order_by(FinancialMetric.report_date.desc())).first()
-            if last_metric:
-                df = df[df["report_date"] > last_metric.report_date]
+            existing_metrics = session.exec(
+                select(FinancialMetric).where(FinancialMetric.stock_id == stock.id)
+            ).all()
             
-            for _, row in df.iterrows():
-                # Convert partial metrics
+            existing_dates = set()
+            for m in existing_metrics:
+                existing_dates.add(m.report_date)
+            
+            if existing_metrics:
+                existing_df = pd.DataFrame([{
+                    "report_date": m.report_date,
+                    "revenue": m.revenue or 0,
+                    "net_profit": m.net_profit or 0,
+                    "roe": m.roe or 0,
+                    "debt_ratio": m.debt_ratio or 0,
+                } for m in existing_metrics])
+                combined_df = pd.concat([existing_df, df], ignore_index=True)
+                combined_df = combined_df.drop_duplicates(subset=["report_date"], keep="last")
+            else:
+                combined_df = df.copy()
+            
+            combined_df = _calculate_yoy(combined_df)
+            
+            yoy_map = {}
+            for _, row in combined_df.iterrows():
+                yoy_map[row["report_date"]] = {
+                    "revenue_yoy": row.get("revenue_yoy"),
+                    "net_profit_yoy": row.get("net_profit_yoy"),
+                }
+            
+            new_rows = df[~df["report_date"].isin(existing_dates)]
+            
+            for _, row in new_rows.iterrows():
+                yoy_data = yoy_map.get(row["report_date"], {})
                 metric = FinancialMetric(
                     stock_id=stock.id,
                     report_date=row["report_date"],
                     revenue=float(row.get("revenue", 0) or 0),
                     net_profit=float(row.get("net_profit", 0) or 0),
                     roe=float(row.get("roe", 0) or 0),
-                    debt_ratio=float(row.get("debt_ratio", 0) or 0)
+                    debt_ratio=float(row.get("debt_ratio", 0) or 0),
+                    revenue_yoy=yoy_data.get("revenue_yoy"),
+                    net_profit_yoy=yoy_data.get("net_profit_yoy"),
                 )
                 session.add(metric)
+            
+            for m in existing_metrics:
+                yoy_data = yoy_map.get(m.report_date)
+                if yoy_data:
+                    if m.revenue_yoy != yoy_data.get("revenue_yoy"):
+                        m.revenue_yoy = yoy_data.get("revenue_yoy")
+                    if m.net_profit_yoy != yoy_data.get("net_profit_yoy"):
+                        m.net_profit_yoy = yoy_data.get("net_profit_yoy")
+            
             session.commit()
-            count += len(df)
-            print(f"Synced financials for {symbol}: {len(df)} records")
+            count += len(new_rows)
+            print(f"Synced financials for {symbol}: {len(new_rows)} new records, updated YoY for {len(existing_metrics)} existing records")
         except Exception as e:
             print(f"Sync financials failed for {symbol}: {e}")
             session.rollback()
     return count
+
+def recalculate_all_financial_yoy(session, progress_callback=None) -> int:
+    """
+    重新计算所有股票财务数据的同比增速
+    用于补算历史数据中缺失的同比字段
+    """
+    from app.models import FinancialMetric
+    
+    stocks = session.exec(select(Stock)).all()
+    total = len(stocks)
+    updated_count = 0
+    
+    for i, stock in enumerate(stocks):
+        if progress_callback:
+            progress_callback(i, total, f"正在计算 {stock.symbol} 同比增速...")
+        
+        try:
+            metrics = session.exec(
+                select(FinancialMetric)
+                .where(FinancialMetric.stock_id == stock.id)
+                .order_by(FinancialMetric.report_date)
+            ).all()
+            
+            if not metrics:
+                continue
+            
+            df = pd.DataFrame([{
+                "report_date": m.report_date,
+                "revenue": m.revenue or 0,
+                "net_profit": m.net_profit or 0,
+                "roe": m.roe or 0,
+                "debt_ratio": m.debt_ratio or 0,
+            } for m in metrics])
+            
+            df = _calculate_yoy(df)
+            
+            yoy_map = {}
+            for _, row in df.iterrows():
+                yoy_map[row["report_date"]] = {
+                    "revenue_yoy": row.get("revenue_yoy"),
+                    "net_profit_yoy": row.get("net_profit_yoy"),
+                }
+            
+            stock_updated = 0
+            for m in metrics:
+                yoy_data = yoy_map.get(m.report_date)
+                if yoy_data:
+                    new_rev_yoy = yoy_data.get("revenue_yoy")
+                    new_net_yoy = yoy_data.get("net_profit_yoy")
+                    
+                    if m.revenue_yoy != new_rev_yoy or m.net_profit_yoy != new_net_yoy:
+                        m.revenue_yoy = new_rev_yoy
+                        m.net_profit_yoy = new_net_yoy
+                        stock_updated += 1
+            
+            session.commit()
+            updated_count += stock_updated
+            
+            if stock_updated > 0:
+                print(f"Recalculated YoY for {stock.symbol}: {stock_updated} records updated")
+        except Exception as e:
+            print(f"Recalculate YoY failed for {stock.symbol}: {e}")
+            session.rollback()
+    
+    if progress_callback:
+        progress_callback(total, total, "同比增速补算完成")
+    
+    return updated_count
 
 def validate_integrity(session, symbol: str, start: date, end: date) -> dict:
     stock = session.exec(select(Stock).where(Stock.symbol == symbol)).first()

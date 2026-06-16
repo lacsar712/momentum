@@ -11,7 +11,7 @@ from sqlmodel import select
 from app.db import get_session
 from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog, StockSnapshot, FinancialMetric, FactorValue, DividendEvent, AnomalyEvent, LhbRecord
 from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport, StockDetailResponse, StockBasicInfo, StockQuoteSnapshot, KLineItem, FinancialSummary, FactorValues, TechnicalIndicators, PatternRecord, PriceRangeAdjRequest, DividendEventCreate, AnomalyScanRequest, AnomalyEventFilter, MockOrderRequest, FactorDistributionRequest, FactorLayeredBacktestRequest, FactorCorrelationRequest, StockFactorTimeseriesRequest, LhbSyncRequest, LhbBrokerageQuery, LhbBrokerageRankingRequest, LhbReasonAggRequest
-from app.services.data_sync import sync_stock_list, sync_daily, validate_integrity
+from app.services.data_sync import sync_stock_list, sync_daily, validate_integrity, recalculate_all_financial_yoy
 from app.services.screening import screen_stocks
 from app.services.patterns import detect_patterns, PATTERN_NAMES
 from app.services.strategies import get_strategy_map
@@ -247,6 +247,25 @@ def update_snapshots(background_tasks: BackgroundTasks, session=Depends(session_
         raise HTTPException(status_code=400, detail="Task already running")
     background_tasks.add_task(run_snapshot_update_task)
     return {"status": "started", "message": "Snapshot update started"}
+
+def run_financial_yoy_recalc_task():
+    global SYNC_STATE
+    SYNC_STATE.update({"status": "running", "type": "yoy_recalc", "current": 0, "total": 0, "message": "补算财务同比增速中..."})
+    try:
+        with get_session() as session:
+            count = recalculate_all_financial_yoy(session, progress_callback=update_progress)
+            SYNC_STATE.update({"status": "finished", "current": count, "total": count, "message": f"财务同比增速补算完成，共更新 {count} 条记录"})
+    except Exception as e:
+        print(f"Background task failed: {e}")
+        SYNC_STATE.update({"status": "error", "message": str(e)})
+
+@router.post("/data/financials/recalculate-yoy")
+def recalculate_financial_yoy(background_tasks: BackgroundTasks, session=Depends(session_dep), user=Depends(admin_dep)):
+    """手动触发财务同比增速补算"""
+    if SYNC_STATE["status"] == "running":
+        raise HTTPException(status_code=400, detail="Task already running")
+    background_tasks.add_task(run_financial_yoy_recalc_task)
+    return {"status": "started", "message": "Financial YoY recalculation started"}
 
 @router.post("/data/daily")
 def get_daily_data(payload: DailyDataRequest, session=Depends(session_dep)):
