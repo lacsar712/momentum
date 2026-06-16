@@ -179,6 +179,9 @@ export default function Portfolio() {
         ? orderPrice * parseInt(orderQuantity)
         : 0
     const estimatedCommission = estimatedAmount * 0.00025
+    const estimatedTotal = orderDirection === 'buy'
+        ? estimatedAmount + estimatedCommission
+        : estimatedAmount - estimatedCommission
 
     const totalTradePages = Math.max(1, Math.ceil(tradeTotal / 10))
 
@@ -395,9 +398,9 @@ export default function Portfolio() {
                                 <span className="font-medium text-slate-900">{estimatedCommission > 0 ? estimatedCommission.toFixed(2) : '-'}</span>
                             </div>
                             <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
-                                <span className="text-slate-500">合计</span>
-                                <span className="font-bold text-slate-900">
-                                    {estimatedAmount > 0 ? formatMoney(estimatedAmount + estimatedCommission) : '-'}
+                                <span className="text-slate-500">{orderDirection === 'buy' ? '合计支付' : '预计到账'}</span>
+                                <span className={`font-bold ${orderDirection === 'buy' ? 'text-red-600' : 'text-emerald-600'}`}>
+                                    {estimatedAmount > 0 ? formatMoney(estimatedTotal) : '-'}
                                 </span>
                             </div>
                         </div>

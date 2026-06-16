@@ -69,18 +69,64 @@ def get_account_summary(session: Session, user_id: int) -> MockAccountSummary:
     cumulative_pnl = total_assets - account.initial_capital
 
     today_pnl = 0.0
+    today_start = datetime.combine(date.today(), datetime.min.time())
+    today_trades = session.exec(
+        select(MockTrade).where(
+            MockTrade.account_id == account.id,
+            MockTrade.status == "filled",
+            MockTrade.traded_at >= today_start,
+        )
+    ).all()
+
+    buy_qty_by_stock: dict[int, int] = {}
+    sell_qty_by_stock: dict[int, int] = {}
+    total_buy_cost = 0.0
+    total_sell_revenue = 0.0
+    total_commission = 0.0
+    for t in today_trades:
+        total_commission += t.commission
+        if t.direction == "buy":
+            buy_qty_by_stock[t.stock_id] = buy_qty_by_stock.get(t.stock_id, 0) + t.quantity
+            total_buy_cost += t.price * t.quantity + t.commission
+        else:
+            sell_qty_by_stock[t.stock_id] = sell_qty_by_stock.get(t.stock_id, 0) + t.quantity
+            total_sell_revenue += t.price * t.quantity - t.commission
+
+    yesterday_cash = account.available_cash + total_buy_cost - total_sell_revenue
+
+    all_stock_ids = set()
+    current_qty_by_stock: dict[int, int] = {}
     for pos in positions:
-        price = get_latest_price(session, pos.stock_id)
-        if price:
-            today_trades = session.exec(
-                select(DailyPrice)
-                .where(DailyPrice.stock_id == pos.stock_id)
-                .order_by(DailyPrice.trade_date.desc())
-                .limit(2)
-            ).all()
-            if len(today_trades) >= 2:
-                prev_close = today_trades[1].close
-                today_pnl += (price - prev_close) * pos.quantity
+        all_stock_ids.add(pos.stock_id)
+        current_qty_by_stock[pos.stock_id] = pos.quantity
+    for sid in buy_qty_by_stock:
+        all_stock_ids.add(sid)
+    for sid in sell_qty_by_stock:
+        all_stock_ids.add(sid)
+
+    prev_close_by_stock: dict[int, float] = {}
+    for sid in all_stock_ids:
+        price_records = session.exec(
+            select(DailyPrice)
+            .where(DailyPrice.stock_id == sid)
+            .order_by(DailyPrice.trade_date.desc())
+            .limit(2)
+        ).all()
+        if len(price_records) >= 2:
+            prev_close_by_stock[sid] = price_records[1].close
+        elif len(price_records) == 1:
+            prev_close_by_stock[sid] = price_records[0].close
+
+    yesterday_position_value = 0.0
+    for sid in all_stock_ids:
+        current_qty = current_qty_by_stock.get(sid, 0)
+        yesterday_qty = current_qty - buy_qty_by_stock.get(sid, 0) + sell_qty_by_stock.get(sid, 0)
+        if yesterday_qty > 0 and sid in prev_close_by_stock:
+            yesterday_position_value += prev_close_by_stock[sid] * yesterday_qty
+
+    yesterday_total = yesterday_cash + yesterday_position_value
+    today_total = account.available_cash + position_market_value
+    today_pnl = today_total - yesterday_total
 
     return MockAccountSummary(
         account_id=account.id,
