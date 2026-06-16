@@ -190,3 +190,15 @@ class AnomalyEvent(SQLModel, table=True):
     strength_score: float = Field(index=True)
     metrics_json: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class LhbRecord(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    symbol: str = Field(index=True)
+    name: str = Field(index=True)
+    trade_date: date = Field(index=True)
+    reason: str = Field(default="")
+    buy_brokerages_json: str = Field(default="[]")
+    sell_brokerages_json: str = Field(default="[]")
+    net_buy_amount: Optional[float] = None
+    total_amount: Optional[float] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)

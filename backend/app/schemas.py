@@ -298,3 +298,19 @@ class AnomalyStatItem(BaseModel):
     rule_id: str
     rule_name: str
     count: int
+
+class LhbSyncRequest(BaseModel):
+    start_date: date
+    end_date: date
+
+class LhbBrokerageQuery(BaseModel):
+    brokerage_name: str
+    recent_days: int = Field(default=30)
+
+class LhbBrokerageRankingRequest(BaseModel):
+    start_date: date
+    end_date: date
+
+class LhbReasonAggRequest(BaseModel):
+    start_date: date
+    end_date: date

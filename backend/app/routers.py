@@ -9,8 +9,8 @@ from fastapi.responses import StreamingResponse
 import pandas as pd
 from sqlmodel import select
 from app.db import get_session
-from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog, StockSnapshot, FinancialMetric, FactorValue, DividendEvent, AnomalyEvent
-from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport, StockDetailResponse, StockBasicInfo, StockQuoteSnapshot, KLineItem, FinancialSummary, FactorValues, TechnicalIndicators, PatternRecord, PriceRangeAdjRequest, DividendEventCreate, AnomalyScanRequest, AnomalyEventFilter, MockOrderRequest, FactorDistributionRequest, FactorLayeredBacktestRequest, FactorCorrelationRequest, StockFactorTimeseriesRequest
+from app.models import Stock, DailyPrice, ScreeningPreset, PatternResult, BacktestResult, StrategyDefinition, User, DataSyncLog, StockSnapshot, FinancialMetric, FactorValue, DividendEvent, AnomalyEvent, LhbRecord
+from app.schemas import DateRangeRequest, DailyDataRequest, PriceRangeRequest, ScreeningRequest, ScreeningExportRequest, ScreeningResponse, PatternScanRequest, BacktestRequest, ExportRequest, PresetRequest, LoginRequest, AuthResponse, LogDeleteRequest, WatchGroupCreate, WatchGroupUpdate, WatchGroupReorder, WatchItemAdd, WatchItemMove, WatchItemNoteUpdate, WatchBatchImport, StockDetailResponse, StockBasicInfo, StockQuoteSnapshot, KLineItem, FinancialSummary, FactorValues, TechnicalIndicators, PatternRecord, PriceRangeAdjRequest, DividendEventCreate, AnomalyScanRequest, AnomalyEventFilter, MockOrderRequest, FactorDistributionRequest, FactorLayeredBacktestRequest, FactorCorrelationRequest, StockFactorTimeseriesRequest, LhbSyncRequest, LhbBrokerageQuery, LhbBrokerageRankingRequest, LhbReasonAggRequest
 from app.services.data_sync import sync_stock_list, sync_daily, validate_integrity
 from app.services.screening import screen_stocks
 from app.services.patterns import detect_patterns, PATTERN_NAMES
@@ -56,6 +56,15 @@ from app.services.realtime import (
 from app.services.anomaly import (
     get_rule_definitions,
     scan_market_anomalies,
+)
+from app.services.lhb import (
+    sync_lhb_daily,
+    sync_lhb_range,
+    query_lhb_by_date,
+    query_lhb_by_symbol,
+    query_lhb_by_brokerage,
+    query_brokerage_ranking,
+    query_reason_aggregation,
 )
 from app.services.mock_trading import (
     get_account_summary as mt_get_account_summary,
@@ -1213,3 +1222,64 @@ def get_anomaly_stats(session=Depends(session_dep), start_date: Optional[date] =
         for k, v in sorted(stats.items(), key=lambda x: x[1], reverse=True)
     ]
     return result
+
+
+LHB_SYNC_STATE = {
+    "status": "idle",
+    "current": 0,
+    "total": 0,
+    "message": "",
+}
+
+def _update_lhb_progress(current, total, message=""):
+    LHB_SYNC_STATE["current"] = current
+    LHB_SYNC_STATE["total"] = total
+    LHB_SYNC_STATE["message"] = message
+
+@router.get("/lhb/sync/progress")
+def get_lhb_sync_progress():
+    return LHB_SYNC_STATE
+
+@router.post("/lhb/sync")
+def sync_lhb(payload: LhbSyncRequest, background_tasks: BackgroundTasks, session=Depends(session_dep), user=Depends(auth_dep)):
+    if LHB_SYNC_STATE["status"] == "running":
+        raise HTTPException(status_code=400, detail="龙虎榜同步任务正在进行中")
+
+    def run_task():
+        global LHB_SYNC_STATE
+        LHB_SYNC_STATE.update({"status": "running", "current": 0, "total": 0, "message": "正在启动..."})
+        try:
+            with get_session() as sess:
+                count = sync_lhb_range(sess, payload.start_date, payload.end_date, progress_callback=_update_lhb_progress)
+                LHB_SYNC_STATE.update({"status": "finished", "current": 1, "total": 1, "message": f"同步完成，共入库 {count} 条记录"})
+        except Exception as e:
+            print(f"LHB sync failed: {e}")
+            LHB_SYNC_STATE.update({"status": "error", "message": f"同步失败: {str(e)}"})
+
+    background_tasks.add_task(run_task)
+    return {"status": "started", "message": "龙虎榜数据同步已启动"}
+
+@router.get("/lhb/date/{target_date}")
+def get_lhb_by_date(target_date: date, session=Depends(session_dep)):
+    records = query_lhb_by_date(session, target_date)
+    return {"date": target_date.isoformat(), "total": len(records), "items": records}
+
+@router.get("/lhb/stock/{symbol}")
+def get_lhb_by_symbol(symbol: str, limit: int = 50, session=Depends(session_dep)):
+    records = query_lhb_by_symbol(session, symbol, limit)
+    return {"symbol": symbol, "total": len(records), "items": records}
+
+@router.post("/lhb/brokerage")
+def get_lhb_by_brokerage(payload: LhbBrokerageQuery, session=Depends(session_dep)):
+    records = query_lhb_by_brokerage(session, payload.brokerage_name, payload.recent_days)
+    return {"brokerage_name": payload.brokerage_name, "total": len(records), "items": records}
+
+@router.post("/lhb/brokerage/ranking")
+def get_lhb_brokerage_ranking(payload: LhbBrokerageRankingRequest, session=Depends(session_dep)):
+    ranking = query_brokerage_ranking(session, payload.start_date, payload.end_date)
+    return {"total": len(ranking), "items": ranking}
+
+@router.post("/lhb/reason/aggregation")
+def get_lhb_reason_aggregation(payload: LhbReasonAggRequest, session=Depends(session_dep)):
+    result = query_reason_aggregation(session, payload.start_date, payload.end_date)
+    return {"total": len(result), "items": result}
