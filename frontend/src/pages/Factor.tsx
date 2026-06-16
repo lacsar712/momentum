@@ -98,6 +98,34 @@ const GROUP_COLORS = [
     '#1e293b',
 ]
 
+interface EmptyStateProps {
+    title: string
+    description: string
+    icon?: 'warn' | 'info'
+}
+
+function EmptyState({ title, description, icon = 'warn' }: EmptyStateProps) {
+    return (
+        <div className="h-full flex flex-col items-center justify-center text-center p-6">
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${
+                icon === 'warn' ? 'bg-amber-50' : 'bg-slate-50'
+            }`}>
+                {icon === 'warn' ? (
+                    <svg className="w-7 h-7 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                ) : (
+                    <svg className="w-7 h-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                )}
+            </div>
+            <h3 className="text-base font-semibold text-slate-700 mb-1">{title}</h3>
+            <p className="text-sm text-slate-500 max-w-xs">{description}</p>
+        </div>
+    )
+}
+
 export default function Factor() {
     const { pushToast } = useToast()
 
@@ -580,11 +608,18 @@ export default function Factor() {
                             <h2 className="text-base font-semibold text-slate-800">横截面分布</h2>
                         </div>
                         <div className="h-96">
-                            <ReactECharts
-                                option={getDistributionChartOption()}
-                                style={{ height: '100%', width: '100%' }}
-                                notMerge={true}
-                            />
+                            {distributionData.count > 0 ? (
+                                <ReactECharts
+                                    option={getDistributionChartOption()}
+                                    style={{ height: '100%', width: '100%' }}
+                                    notMerge={true}
+                                />
+                            ) : (
+                                <EmptyState
+                                    title="暂无分布数据"
+                                    description="当日没有可用的因子值数据，请选择其他日期"
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -594,11 +629,18 @@ export default function Factor() {
                             <h2 className="text-base font-semibold text-slate-800">分层回测净值</h2>
                         </div>
                         <div className="h-96">
-                            <ReactECharts
-                                option={getLayeredChartOption()}
-                                style={{ height: '100%', width: '100%' }}
-                                notMerge={true}
-                            />
+                            {layeredData && layeredData.groups.length > 0 ? (
+                                <ReactECharts
+                                    option={getLayeredChartOption()}
+                                    style={{ height: '100%', width: '100%' }}
+                                    notMerge={true}
+                                />
+                            ) : (
+                                <EmptyState
+                                    title="样本不足，无法分层"
+                                    description={`分层回测需要至少 ${parseInt(nGroups) * 2} 只有效因子值的股票，当前仅有 ${layeredData?.count || 0} 只。请减少分层数或选择数据更完整的日期。`}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -609,11 +651,18 @@ export default function Factor() {
                                 <h2 className="text-base font-semibold text-slate-800">因子相关性</h2>
                             </div>
                             <div className="h-80">
-                                <ReactECharts
-                                    option={getCorrelationChartOption()}
-                                    style={{ height: '100%', width: '100%' }}
-                                    notMerge={true}
-                                />
+                                {correlationData && correlationData.count > 0 ? (
+                                    <ReactECharts
+                                        option={getCorrelationChartOption()}
+                                        style={{ height: '100%', width: '100%' }}
+                                        notMerge={true}
+                                    />
+                                ) : (
+                                    <EmptyState
+                                        title="暂无相关性数据"
+                                        description="当日有完整三因子数据的股票不足，无法计算相关性矩阵"
+                                    />
+                                )}
                             </div>
                         </div>
 
@@ -627,43 +676,52 @@ export default function Factor() {
                                     </span>
                                 </h2>
                             </div>
-                            <div className="h-80 overflow-y-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
-                                        <tr className="text-left text-slate-500 border-b border-slate-100">
-                                            <th className="py-2.5 px-3 font-medium w-16">排名</th>
-                                            <th className="py-2.5 px-3 font-medium">代码</th>
-                                            <th className="py-2.5 px-3 font-medium">名称</th>
-                                            <th className="py-2.5 px-3 font-medium text-right">因子值</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {distributionData.stocks.slice(0, 100).map((stock) => (
-                                            <tr
-                                                key={stock.symbol}
-                                                className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
-                                            >
-                                                <td className="py-2.5 px-3">
-                                                    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                                                        stock.rank <= 10
-                                                            ? 'bg-emerald-100 text-emerald-700'
-                                                            : stock.rank >= distributionData.stocks.length - 9
-                                                            ? 'bg-red-100 text-red-700'
-                                                            : 'bg-slate-100 text-slate-600'
-                                                    }`}>
-                                                        {stock.rank}
-                                                    </span>
-                                                </td>
-                                                <td className="py-2.5 px-3 font-mono text-slate-700">{stock.symbol}</td>
-                                                <td className="py-2.5 px-3 text-slate-700">{stock.name}</td>
-                                                <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-900">
-                                                    {stock.value.toFixed(4)}
-                                                </td>
+                            {distributionData.stocks.length > 0 ? (
+                                <div className="h-80 overflow-y-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                                            <tr className="text-left text-slate-500 border-b border-slate-100">
+                                                <th className="py-2.5 px-3 font-medium w-16">排名</th>
+                                                <th className="py-2.5 px-3 font-medium">代码</th>
+                                                <th className="py-2.5 px-3 font-medium">名称</th>
+                                                <th className="py-2.5 px-3 font-medium text-right">因子值</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody>
+                                            {distributionData.stocks.slice(0, 100).map((stock) => (
+                                                <tr
+                                                    key={stock.symbol}
+                                                    className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
+                                                >
+                                                    <td className="py-2.5 px-3">
+                                                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                                                            stock.rank <= 10
+                                                                ? 'bg-emerald-100 text-emerald-700'
+                                                                : stock.rank >= distributionData.stocks.length - 9
+                                                                ? 'bg-red-100 text-red-700'
+                                                                : 'bg-slate-100 text-slate-600'
+                                                        }`}>
+                                                            {stock.rank}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 font-mono text-slate-700">{stock.symbol}</td>
+                                                    <td className="py-2.5 px-3 text-slate-700">{stock.name}</td>
+                                                    <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-900">
+                                                        {stock.value.toFixed(4)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="h-80">
+                                    <EmptyState
+                                        title="暂无排名数据"
+                                        description="当日没有可用的因子值数据，无法生成排名"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </>
