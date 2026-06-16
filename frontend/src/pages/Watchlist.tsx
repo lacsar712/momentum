@@ -6,7 +6,6 @@ import {
     FolderOpen, ChevronRight, Loader2,
 } from 'lucide-react'
 import Loading from '../components/Loading'
-import StockNameLink from '../components/StockNameLink'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 
@@ -493,17 +492,19 @@ export default function Watchlist() {
                                     {items.map((item) => (
                                         <tr
                                             key={item.item_id}
-                                            draggable
-                                            onDragStart={() => handleItemDragStart(item.item_id, selectedGroupId!)}
-                                            className="hover:bg-slate-50/80 transition-colors group"
+                                            onClick={() => navigate(`/visual?symbol=${item.symbol}`)}
+                                            className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                                         >
-                                            <td className="px-4 py-3 text-slate-300 cursor-grab" onClick={(e) => e.stopPropagation()}>
+                                            <td
+                                                className="px-4 py-3 text-slate-300 cursor-grab"
+                                                draggable
+                                                onDragStart={() => handleItemDragStart(item.item_id, selectedGroupId!)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
                                                 <GripVertical size={14} />
                                             </td>
                                             <td className="px-4 py-3 text-sm font-medium text-slate-900">{item.symbol}</td>
-                                            <td className="px-4 py-3">
-                                                <StockNameLink symbol={item.symbol} name={item.name} />
-                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">{item.name}</td>
                                             <td className="px-4 py-3 text-sm text-right font-medium text-slate-900">
                                                 {item.latest_close !== null ? item.latest_close.toFixed(2) : '-'}
                                             </td>
@@ -568,7 +569,7 @@ export default function Watchlist() {
                     {selectedGroupId && items.length > 0 && (
                         <div className="px-5 py-2 border-t border-slate-100 bg-slate-50/30 text-xs text-slate-400 flex items-center gap-2">
                             <GripVertical size={12} />
-                            <span>拖拽行到左侧分组可跨组移动 · 单击行跳转K线页 · 点击备注可编辑</span>
+                            <span>拖拽左侧把手到分组可跨组移动 · 点击行跳转K线页 · 点击备注可编辑</span>
                         </div>
                     )}
                 </div>

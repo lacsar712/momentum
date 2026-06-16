@@ -1,6 +1,6 @@
-from datetime import date, timedelta
+from datetime import date
 from typing import List, Dict, Any, Optional
-from sqlalchemy import func, and_
+from sqlalchemy import func
 from sqlmodel import select, Session
 from app.models import WatchGroup, WatchItem, Stock, StockSnapshot, DailyPrice
 
@@ -228,13 +228,16 @@ def query_group_items(session: Session, user_id: int, group_id: int) -> List[Dic
         select(StockSnapshot).where(StockSnapshot.stock_id.in_(stock_ids))
     ).all()
     snapshot_map = {s.stock_id: s for s in snapshots}
-    five_days_ago = date.today() - timedelta(days=7)
     price_5d_map: Dict[int, float] = {}
     for sid in stock_ids:
+        snap = snapshot_map.get(sid)
+        if not snap:
+            continue
         price_5d = session.exec(
             select(DailyPrice)
-            .where(DailyPrice.stock_id == sid, DailyPrice.trade_date >= five_days_ago)
-            .order_by(DailyPrice.trade_date.asc())
+            .where(DailyPrice.stock_id == sid, DailyPrice.trade_date < snap.latest_date)
+            .order_by(DailyPrice.trade_date.desc())
+            .offset(4)
             .limit(1)
         ).first()
         if price_5d:
