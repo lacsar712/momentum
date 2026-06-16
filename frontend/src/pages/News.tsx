@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import {
     Search, Calendar, Filter, Newspaper, TrendingUp, RefreshCw,
     ChevronDown, ChevronUp, ExternalLink, Clock, Building2,
-    FileText, BarChart3, X, Check, Download, Flame,
+    FileText, BarChart3, X, Check, Download, Flame, Layers,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 import DatePicker from '../components/DatePicker'
 import Loading from '../components/Loading'
+import StockNameLink from '../components/StockNameLink'
 import { AxiosResponse } from 'axios'
 
 interface NewsItem {
@@ -43,6 +44,15 @@ interface HotStocksResponse {
     date: string
     top_n: number
     items: HotStockItem[]
+}
+
+interface SectorItem {
+    sector: string
+    news_count: number
+}
+
+interface SectorsResponse {
+    sectors: SectorItem[]
 }
 
 interface SyncProgress {
@@ -107,6 +117,11 @@ export default function News() {
     const [stockSelectorOpen, setStockSelectorOpen] = useState(false)
     const [stockSearch, setStockSearch] = useState('')
 
+    const [sectorList, setSectorList] = useState<SectorItem[]>([])
+    const [selectedSectors, setSelectedSectors] = useState<string[]>([])
+    const [sectorSelectorOpen, setSectorSelectorOpen] = useState(false)
+    const [sectorSearch, setSectorSearch] = useState('')
+
     const [newsList, setNewsList] = useState<NewsItem[]>([])
     const [newsLoading, setNewsLoading] = useState(false)
     const [total, setTotal] = useState(0)
@@ -132,12 +147,13 @@ export default function News() {
     useEffect(() => {
         loadStockList()
         loadNewsTypes()
+        loadSectorList()
     }, [])
 
     useEffect(() => {
         loadNews()
         loadHotStocks()
-    }, [page, selectedType, startDate, endDate, selectedStocks])
+    }, [page, selectedType, startDate, endDate, selectedStocks, selectedSectors])
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -157,6 +173,7 @@ export default function News() {
                             pushToast(res.data.message || '同步完成', 'success')
                             loadNews()
                             loadHotStocks()
+                            loadSectorList()
                         } else if (res.data.status === 'error') {
                             pushToast(res.data.message || '同步失败', 'error')
                         }
@@ -181,6 +198,13 @@ export default function News() {
         } catch {}
     }
 
+    const loadSectorList = async () => {
+        try {
+            const res: AxiosResponse<SectorsResponse> = await api.get('/news/sectors')
+            setSectorList(res.data.sectors || [])
+        } catch {}
+    }
+
     const loadNews = useCallback(async () => {
         setNewsLoading(true)
         try {
@@ -193,6 +217,7 @@ export default function News() {
             if (startDate) payload.start_date = startDate
             if (endDate) payload.end_date = endDate
             if (selectedStocks.length > 0) payload.symbol = selectedStocks
+            if (selectedSectors.length > 0) payload.sector = selectedSectors
 
             const res: AxiosResponse<NewsListResponse> = await api.post('/news/query', payload)
             setNewsList(res.data.items || [])
@@ -202,7 +227,7 @@ export default function News() {
         } finally {
             setNewsLoading(false)
         }
-    }, [page, keyword, selectedType, startDate, endDate, selectedStocks])
+    }, [page, keyword, selectedType, startDate, endDate, selectedStocks, selectedSectors])
 
     const loadHotStocks = async () => {
         setHotStocksLoading(true)
@@ -225,6 +250,18 @@ export default function News() {
 
     const clearStockSelection = () => {
         setSelectedStocks([])
+    }
+
+    const toggleSector = (sector: string) => {
+        setSelectedSectors(prev =>
+            prev.includes(sector)
+                ? prev.filter(s => s !== sector)
+                : [...prev, sector]
+        )
+    }
+
+    const clearSectorSelection = () => {
+        setSelectedSectors([])
     }
 
     const handleCardClick = async (item: NewsItem) => {
@@ -277,6 +314,12 @@ export default function News() {
             s.name.toLowerCase().includes(search)
         )
     }, [stockList, stockSearch])
+
+    const filteredSectorList = useMemo(() => {
+        if (!sectorSearch) return sectorList
+        return sectorList.filter(s =>
+            s.sector.toLowerCase().includes(sectorSearch.toLowerCase())
+    }, [sectorList, sectorSearch])
 
     return (
         <div className="space-y-6 animate-fade-in-up">
@@ -423,6 +466,94 @@ export default function News() {
                                         清除日期
                                     </button>
                                 )}
+                            </div>
+
+                            <div>
+                                <label className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-2">
+                                    <span className="flex items-center gap-2">
+                                        <Layers size={12} />
+                                        关联板块
+                                    </span>
+                                    {selectedSectors.length > 0 && (
+                                        <button
+                                            onClick={clearSectorSelection}
+                                            className="text-slate-400 hover:text-red-500 flex items-center gap-0.5"
+                                        >
+                                            <X size={10} />清除
+                                        </button>
+                                    )}
+                                </label>
+
+                                {selectedSectors.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mb-2 max-h-20 overflow-y-auto">
+                                        {selectedSectors.map(sec => (
+                                            <span
+                                                key={sec}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-700 border border-amber-200"
+                                            >
+                                                {sec}
+                                                <button
+                                                    onClick={() => toggleSector(sec)}
+                                                    className="hover:bg-amber-100 rounded-full"
+                                                >
+                                                    <X size={10} />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setSectorSelectorOpen(!sectorSelectorOpen)}
+                                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border-2 border-slate-200 text-sm hover:border-primary/30 transition-all"
+                                    >
+                                        <span className="text-slate-500">选择板块（多选）</span>
+                                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${sectorSelectorOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {sectorSelectorOpen && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl bg-white border-2 border-slate-200 shadow-xl overflow-hidden">
+                                            <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-slate-50">
+                                                <Search size={14} className="text-slate-400" />
+                                                <input
+                                                    autoFocus
+                                                    value={sectorSearch}
+                                                    onChange={(e) => setSectorSearch(e.target.value)}
+                                                    placeholder="搜索板块名称"
+                                                    className="flex-1 bg-transparent text-sm outline-none"
+                                                />
+                                            </div>
+                                            <div className="max-h-60 overflow-y-auto">
+                                                {filteredSectorList.slice(0, 100).map(sec => (
+                                                    <button
+                                                        key={sec.sector}
+                                                        onClick={() => toggleSector(sec.sector)}
+                                                        className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-slate-50 transition-colors ${
+                                                            selectedSectors.includes(sec.sector) ? 'bg-amber-50' : ''
+                                                        }`}
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                                            <span className="text-slate-700">{sec.sector}</span>
+                                                            <span className="text-xs text-slate-400">
+                                                                {sec.news_count > 0 ? `${sec.news_count}条` : ''}
+                                                            </span>
+                                                        </span>
+                                                        {selectedSectors.includes(sec.sector) && (
+                                                            <Check size={14} className="text-amber-500" />
+                                                        )}
+                                                    </button>
+                                                ))}
+                                                {filteredSectorList.length === 0 && (
+                                                    <div className="px-3 py-6 text-center text-sm text-slate-400">
+                                                        暂无板块数据
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div>

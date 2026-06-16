@@ -72,6 +72,7 @@ from app.services.news import (
     get_news_detail,
     get_hot_stocks,
     get_news_by_symbol,
+    get_sector_list_for_filter,
     NEWS_TYPES,
 )
 from app.services.mock_trading import (
@@ -1393,6 +1394,11 @@ def query_news_items(payload: NewsQueryFilter, session=Depends(session_dep)):
 @router.get("/news/types")
 def list_news_types():
     return {"types": NEWS_TYPES}
+
+@router.get("/news/sectors")
+def list_news_sectors(session=Depends(session_dep)):
+    sectors = get_sector_list_for_filter(session)
+    return {"sectors": sectors}
 
 @router.get("/news/{news_id}")
 def get_single_news(news_id: int, session=Depends(session_dep)):

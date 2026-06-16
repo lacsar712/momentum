@@ -123,6 +123,9 @@ def _upsert_news_items(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
 ) -> int:
+    stock = session.exec(select(Stock).where(Stock.symbol == symbol)).first()
+    sector = stock.industry if stock and stock.industry else None
+
     count = 0
     for _, row in df.iterrows():
         title = str(row.get("标题", row.get("title", ""))).strip()
@@ -154,12 +157,14 @@ def _upsert_news_items(
             existing.summary = summary or existing.summary
             existing.raw_html = raw_html or existing.raw_html
             existing.url = url or existing.url
+            if sector and not existing.sector:
+                existing.sector = sector
             session.add(existing)
         else:
             record = NewsItem(
                 source=source,
                 symbol=symbol,
-                sector=None,
+                sector=sector,
                 title=title,
                 url=url,
                 publish_time=publish_time,
@@ -414,3 +419,41 @@ def get_news_by_symbol(
         stock_map[symbol] = stock.name
 
     return [_news_item_to_dict(i, stock_map) for i in items]
+
+def get_sector_list_for_filter(session: Session) -> List[Dict[str, Any]]:
+    """
+    获取有资讯数据的行业板块列表，用于筛选器
+    """
+    sectors = session.exec(
+        select(NewsItem.sector, func.count(NewsItem.id).label("cnt"))
+        .where(NewsItem.sector != None)
+        .where(NewsItem.sector != "")
+        .group_by(NewsItem.sector)
+        .order_by(func.count(NewsItem.id).desc())
+    ).all()
+
+    result = []
+    for row in sectors:
+        sector_name = row[0]
+        count = row[1]
+        result.append({
+            "sector": sector_name,
+            "news_count": count,
+        })
+
+    if not result:
+        stocks = session.exec(
+            select(Stock)
+            .where(Stock.industry != None)
+            .where(Stock.industry != "")
+        ).all()
+        sector_counts: Dict[str, int] = {}
+        for s in stocks:
+            sector_counts[s.industry] = sector_counts.get(s.industry, 0) + 1
+        for sec, cnt in sorted(sector_counts.items(), key=lambda x: -x[1]):
+            result.append({
+                "sector": sec,
+                "news_count": 0,
+            })
+
+    return result
