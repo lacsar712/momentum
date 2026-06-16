@@ -9,7 +9,6 @@ import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 import DatePicker from '../components/DatePicker'
 import Loading from '../components/Loading'
-import StockNameLink from '../components/StockNameLink'
 import { AxiosResponse } from 'axios'
 
 interface NewsItem {
@@ -319,6 +318,7 @@ export default function News() {
         if (!sectorSearch) return sectorList
         return sectorList.filter(s =>
             s.sector.toLowerCase().includes(sectorSearch.toLowerCase())
+        )
     }, [sectorList, sectorSearch])
 
     return (

@@ -51,7 +51,6 @@ export default function Visual() {
     const [freq, setFreq] = useState('D')
     const [adjust, setAdjust] = useState('none')
     const [loadedAdjust, setLoadedAdjust] = useState('none')
-    const [loadedFreq, setLoadedFreq] = useState('D')
     const [indicators, setIndicators] = useState({
         ma5: true,
         ma20: true,
@@ -97,7 +96,6 @@ export default function Visual() {
                 setPrices(res.data.prices)
                 setDividendEvents(res.data.dividend_events)
                 setLoadedAdjust(adjust)
-                setLoadedFreq(freq)
             })
             .catch(() => pushToast('K线数据加载失败', 'error'))
             .finally(() => setLoading(false))
