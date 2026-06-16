@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
     Zap, Grid3X3, List, Play, Pause, RefreshCw, X, Plus,
     TrendingUp, TrendingDown, Search, Star, Check, Loader2,
@@ -36,7 +35,6 @@ interface WatchGroupType {
 const POLL_INTERVAL = 3000
 
 export default function Realtime() {
-    const navigate = useNavigate()
     const { pushToast } = useToast()
 
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card')

@@ -312,7 +312,7 @@ export default function Factor() {
             return {}
         }
 
-        const series = layeredData.groups.map((group, idx) => ({
+        const series: any[] = layeredData.groups.map((group, idx) => ({
             name: group.label,
             type: 'line',
             data: group.cum_returns.map((v, i) => [group.dates[i], v]),
@@ -368,10 +368,11 @@ export default function Factor() {
                 formatter: (params: any[]) => {
                     let result = `<div class="font-medium mb-1">${params[0]?.axisValue}</div>`
                     params.forEach((p) => {
-                        const ret = ((p.data[1] - 1) * 100).toFixed(2)
+                        const retNum = (p.data[1] - 1) * 100
+                        const ret = retNum.toFixed(2)
                         result += `<div class="flex justify-between gap-4">
                             <span>${p.marker}${p.seriesName}</span>
-                            <span class="font-mono font-medium">${ret >= 0 ? '+' : ''}${ret}%</span>
+                            <span class="font-mono font-medium">${retNum >= 0 ? '+' : ''}${ret}%</span>
                         </div>`
                     })
                     return result
@@ -567,7 +568,7 @@ export default function Factor() {
 
             {loading && (
                 <div className="py-20 flex items-center justify-center">
-                    <Loading size="lg" />
+                    <Loading />
                 </div>
             )}
 

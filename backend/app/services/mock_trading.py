@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from sqlmodel import select, Session
+from sqlalchemy.exc import IntegrityError
 from app.models import MockAccount, MockTrade, MockPosition, Stock, StockSnapshot, DailyPrice
 from app.schemas import MockAccountSummary, MockPositionItem, MockTradeItem
 
@@ -11,16 +12,25 @@ def get_or_create_account(session: Session, user_id: int) -> MockAccount:
     account = session.exec(
         select(MockAccount).where(MockAccount.user_id == user_id)
     ).first()
-    if not account:
-        account = MockAccount(
-            user_id=user_id,
-            initial_capital=DEFAULT_CAPITAL,
-            available_cash=DEFAULT_CAPITAL,
-            cumulative_pnl=0.0,
-        )
-        session.add(account)
+    if account:
+        return account
+
+    account = MockAccount(
+        user_id=user_id,
+        initial_capital=DEFAULT_CAPITAL,
+        available_cash=DEFAULT_CAPITAL,
+        cumulative_pnl=0.0,
+    )
+    session.add(account)
+    try:
         session.commit()
         session.refresh(account)
+    except IntegrityError:
+        # 并发请求可能已先创建了账户，回滚后重新读取已存在的记录
+        session.rollback()
+        account = session.exec(
+            select(MockAccount).where(MockAccount.user_id == user_id)
+        ).first()
     return account
 
 

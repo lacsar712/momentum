@@ -5,6 +5,7 @@ import Loading from '../components/Loading'
 import StockNameLink from '../components/StockNameLink'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
+import { useAuth } from '../lib/auth'
 import { AxiosResponse } from 'axios'
 import DatePicker from '../components/DatePicker'
 

@@ -139,7 +139,7 @@ export default function SectorFundFlow() {
                         <h3 className="text-lg font-semibold text-slate-900 mb-2">加载失败</h3>
                         <p className="text-sm text-slate-500 mb-4">{error}</p>
                         <button
-                            onClick={() => window.location.reload()}
+                            onClick={() => location.reload()}
                             className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
                         >
                             重新加载

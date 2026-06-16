@@ -46,3 +46,6 @@ redis_data/
 # 前端源码目录，避免被上面 Python 的 lib/ 规则误忽略
 !frontend/src/lib/
 !frontend/src/lib/**
+
+# trae 文档目录
+trae/

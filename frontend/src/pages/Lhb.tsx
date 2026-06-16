@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
     Calendar, Search, Building2, PieChart, ChevronDown, ChevronUp,
-    RefreshCw, Download, TrendingUp, TrendingDown, ArrowLeft, Play,
+    RefreshCw, Download, TrendingUp, ArrowLeft,
 } from 'lucide-react'
 import ReactECharts from 'echarts-for-react'
 import { api } from '../lib/api'
@@ -477,7 +477,7 @@ export default function Lhb() {
                             <div className="relative">
                                 <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-slate-200" />
                                 <div className="space-y-4">
-                                    {stockRecords.map((record, idx) => (
+                                    {stockRecords.map((record) => (
                                         <div key={record.id} className="relative pl-12">
                                             <div className="absolute left-3 top-4 w-5 h-5 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center">
                                                 <div className="w-2 h-2 rounded-full bg-primary" />

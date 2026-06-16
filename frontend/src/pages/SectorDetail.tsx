@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
-import { ArrowLeft, TrendingUp, TrendingDown, Building2, Activity, BarChart3 } from 'lucide-react'
+import { ArrowLeft, TrendingUp, TrendingDown, Building2, BarChart3 } from 'lucide-react'
 import Loading from '../components/Loading'
 import StockNameLink from '../components/StockNameLink'
 import { api } from '../lib/api'
